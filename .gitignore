@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# VS Code
+.vscode/
+
+# Local files
+uploads/
+
+# PDF files
+*.pdf
+
+venv/

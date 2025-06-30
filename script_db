@@ -1,0 +1,19 @@
+-- Enable extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Table: document_data
+CREATE TABLE document_data (
+    chunk_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_name TEXT NOT NULL,
+    chunk_number INTEGER NOT NULL,
+    chunk_content TEXT NOT NULL,
+    role TEXT NOT NULL
+);
+
+-- Table: user_role_map
+CREATE TABLE IF NOT EXISTS user_role_map (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "user" TEXT NOT NULL,
+  role TEXT NOT NULL
+);
+
