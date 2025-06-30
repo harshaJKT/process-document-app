@@ -5,3 +5,4 @@ venv/lib/python3.12/site-packages/anyio/_core/__pycache__/_synchronization.cpyth
 app/__pycache__/
 app/routers/__pycache__/
 __pycache__/config.cpython-312.pyc
+config.py
