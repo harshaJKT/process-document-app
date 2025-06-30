@@ -1,0 +1,29 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+
+# Environment files
+.env
+.env.*
+
+# Upload directory
+uploads/
+
+# Log files
+*.log
+
+# Pytest cache
+.pytest_cache/
+
+# VS Code settings
+.vscode/
+
+# DBeaver or DB local data (if any)
+*.sql
+
+# MacOS
+.DS_Store
