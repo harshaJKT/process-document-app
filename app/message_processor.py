@@ -59,12 +59,12 @@ async def read_file_content(file_path):
 
 async def chunk_content(content):
     """
-    Split content into chunks of ~500 characters (min 100)
+    Split content into chunks of ~100 characters (min 10)
     """
     content = content.replace("\n", " ").strip()
     chunks = []
-    chunk_size = 500
-    min_size = 100
+    chunk_size = 100
+    min_size = 10
 
     index = 0
     while index < len(content):
