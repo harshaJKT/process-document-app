@@ -7,7 +7,7 @@ Base = declarative_base()
 
 
 class DocumentData(Base):
-    __tablename__ = "document_data"
+    __tablename__ = "document_chunks"
 
     chunk_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_name = Column(Text, nullable=False)

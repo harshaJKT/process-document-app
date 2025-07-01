@@ -16,6 +16,8 @@ class UserRoleResponse(BaseModel):
     id: str
     user: str
     role: str
+class UserRoleUpdate(BaseModel):
+    role: str
 
 
 @router.post("/user-role", response_model=UserRoleResponse, status_code=201)
