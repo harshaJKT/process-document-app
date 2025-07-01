@@ -1,3 +1,3 @@
 # Simple configuration
-DATABASE_URL = "postgresql://white_rabbit:Sunny%401234@localhost:5432/mydatabase"
+DATABASE_URL = "your db url"
 UPLOAD_DIR = "uploads"
