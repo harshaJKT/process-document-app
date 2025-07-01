@@ -103,5 +103,5 @@ async def store_chunks_in_db(chunks, document_name, role):
             chunk_content=chunk,
             role=role
         )
-    db.add(doc_data)
+        db.add(doc_data)
     db.commit()
