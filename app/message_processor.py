@@ -5,7 +5,13 @@ import asyncio
 import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
+from app.database import get_db
 from app.models import DocumentData
+from fastapi import Depends
+
+
+def divide_into_chunks(content,chunk_size)->list:
+    return [content[i:i+chunk_size] for i in range(0,len(content),chunk_size)]
 
 
 async def process_document(message):
@@ -25,11 +31,14 @@ async def process_document(message):
     print(f"[Worker] Processing file: {original_name} at {file_path}")
 
     # TODO: Read file content
+    content = await read_file_content(file_path)
 
     # TODO: Chunk content
+    chunks = await chunk_content(content)
 
     # TODO: Store chunks in database
     # store_chunks_in_db(chunks, document_name, role)
+    await store_chunks_in_db(chunks , original_name , role)
 
     print(f"[Worker] Completed processing: {original_name}")
 
@@ -40,6 +49,20 @@ async def read_file_content(file_path):
     - Support PDF files using PyPDF2
     - Return file content as string
     """
+    try:
+        text = ""
+        
+        with open(file_path,'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                page_text=page.extract_text()
+                if page_text:
+                    text+=page_text
+            return text
+    except Exception as e:
+        raise e
+
+    
 
 
 async def chunk_content(content):
@@ -49,7 +72,11 @@ async def chunk_content(content):
     - Ensure size of each chunk is < 100 characters and > 10 characters
     - Return list of chunks
     """
-    pass  # TODO: Implement content chunking logic
+    # TODO: Implement content chunking logic
+    chunk_size = 50
+    chunks = divide_into_chunks(content,chunk_size)
+    return chunks
+
 
 
 async def store_chunks_in_db(chunks, document_name, role):
@@ -60,3 +87,20 @@ async def store_chunks_in_db(chunks, document_name, role):
     - Commit to database
     """
     pass  # TODO: Implement database storage logic
+    db:Session = SessionLocal()
+    try:
+
+        chunk_number = 1
+        for chunk in chunks:
+            record = DocumentData(document_name = document_name , chunk_number = chunk_number , chunk_content = chunk , role = role)
+            chunk_number+=1
+            db.add(record)
+        
+        db.commit()
+        
+    except Exception as e:
+        db.rollback()
+        raise e
+    finally:
+        db.close()
+
