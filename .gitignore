@@ -1,0 +1,53 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.env.*
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# VS Code and IDE settings
+.vscode/
+.idea/
+
+# Logs and runtime
+*.log
+*.pid
+*.db
+*.sqlite3
+
+# Mypy, coverage, and test reports
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+.cache/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Pydantic compiled models (if any)
+*.pyd
+
+# Docker
+**/__pycache__/
+docker-compose.override.yml
+
+# Pyre type checker
+.pyre/
+
+# Static & Media (if applicable)
+staticfiles/
+media/
