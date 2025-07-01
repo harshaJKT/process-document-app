@@ -61,6 +61,37 @@ def get_all_user_roles(db: Session = Depends(get_db)):
         return response
     except Exception as e:
         return {"error": str(e)}
+    
+# PATCH AND DELETE endpoints
+
+@router.put("/user-role/{id}", response_model=UserRoleResponse)
+def update_user_role(id: str, updated_data: UserRoleUpdate, db: Session = Depends(get_db)):
+    """
+    Update role for a specific user-role mapping
+    """
+    user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+    if not user_role:
+        raise HTTPException(status_code=404, detail="UserRoleMap not found")
+
+    user_role.role = updated_data.role
+    db.commit()
+    db.refresh(user_role)
+
+    return UserRoleResponse(id=str(user_role.id), user=user_role.user, role=user_role.role)
+
+
+@router.delete("/user-role/{id}")
+def delete_user_role(id: str, db: Session = Depends(get_db)):
+    """
+    Delete a user-role mapping
+    """
+    user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+    if not user_role:
+        raise HTTPException(status_code=404, detail="UserRoleMap not found")
+
+    db.delete(user_role)
+    db.commit()
+    return {"detail": f"UserRoleMap with ID {id} deleted successfully."}
 
 
  
