@@ -8,7 +8,8 @@ from app.database import SessionLocal
 from app.models import DocumentData
 import re
  
- 
+CHUNK_MIN = 10
+CHUNK_MAX = 100
 async def process_document(message):
     """
     TODO: Implement document processing logic
