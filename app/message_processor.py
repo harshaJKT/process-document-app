@@ -1,75 +1,28 @@
 import uuid
 import PyPDF2
-import os
-import asyncio
-import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import DocumentData
 
 
-async def process_document(message):
+def divide_into_chunks(content: str, chunk_size: int = 50) -> list[str]:
     """
-    TODO: Implement document processing logic
-    - Extract file_path and original_name from message
-    - Read file content (PDF/text)
-    - Chunk content into paragraphs/pages (min 4 chunks)
-    - Store each chunk in document_data table with chunk_number
+    Splits the content into chunks of specified size.
+    Each chunk should be between 10 and 100 characters ideally.
     """
-
-    # These keys should be present in the message while publishing the message to the topic.
-    file_path = message["file_path"]
-    original_name = message["original_name"]
-    role = message.get("role_required", "Analyst")
-
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
-
-     
-    print(f"[Worker] Completed processing: {original_name}")
+    return [
+        content[i:i + chunk_size]
+        for i in range(0, len(content), chunk_size)
+        if 10 < len(content[i:i + chunk_size]) <= 100
+    ]
 
 
-async def read_file_content(file_path):
+async def process_document(message: dict):
     """
-    TODO: Implement file reading logic
-    - Support PDF files using PyPDF2
-    - Return file content as string
-    """
-
-
-async def chunk_content(content):
-    """
-    TODO: Implement content chunking logic
-    - Split content into paragraphs or pages
-    - Ensure size of each chunk is < 100 characters and > 10 characters
-    - Return list of chunks
-    """
-    pass  
-
-
-async def store_chunks_in_db(chunks, document_name, role):
-    """
-    TODO: Implement database storage logic
-    - Create database session
-    - For each chunk, create DocumentData record with chunk_number
-    - Commit to database
-    """
-    pass  
-import uuid
-import PyPDF2
-import os
-import asyncio
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
-from app.models import DocumentData
-
-
-def divide_into_chunks(content, chunk_size) -> list:
-    return [content[i:i + chunk_size] for i in range(0, len(content), chunk_size)]
-
-
-async def process_document(message):
-    """
-    Main processing logic for uploaded document.
+    Handles the document processing pipeline:
+    - Reads the PDF file
+    - Chunks the content
+    - Stores chunks in the database
     """
     file_path = message["file_path"]
     original_name = message["original_filename"]
@@ -77,21 +30,21 @@ async def process_document(message):
 
     print(f"[Worker] Processing file: {original_name} at {file_path}")
 
-    # 1. Read content
+    # Step 1: Read PDF content
     content = await read_file_content(file_path)
 
-    # 2. Chunk content
+    # Step 2: Split into chunks
     chunks = await chunk_content(content)
 
-    # 3. Store chunks in DB
+    # Step 3: Store each chunk in DB
     await store_chunks_in_db(chunks, original_name, role)
 
     print(f"[Worker] Completed processing: {original_name}")
 
 
-async def read_file_content(file_path):
+async def read_file_content(file_path: str) -> str:
     """
-    Reads PDF content using PyPDF2.
+    Extracts text content from a PDF file using PyPDF2.
     """
     try:
         text = ""
@@ -103,27 +56,28 @@ async def read_file_content(file_path):
                     text += page_text
         return text.strip()
     except Exception as e:
-        raise RuntimeError(f"Error reading file: {e}")
+        raise RuntimeError(f"Error reading PDF: {e}")
 
 
-async def chunk_content(content):
+async def chunk_content(content: str) -> list[str]:
     """
-    Splits content into chunks (10–100 characters), minimum 4 chunks.
+    Splits content into chunks (between 10–100 characters). Ensures at least 4 chunks.
     """
-    chunk_size = 50
-    chunks = divide_into_chunks(content, chunk_size)
-    
-    # Ensure minimum 4 chunks
+    chunks = divide_into_chunks(content, chunk_size=50)
+
     if len(chunks) < 4:
         avg_len = max(10, len(content) // 4)
-        chunks = [content[i:i+avg_len] for i in range(0, len(content), avg_len)]
+        chunks = [
+            content[i:i + avg_len]
+            for i in range(0, len(content), avg_len)
+        ]
 
     return chunks
 
 
-async def store_chunks_in_db(chunks, document_name, role):
+async def store_chunks_in_db(chunks: list[str], document_name: str, role: str):
     """
-    Stores each chunk into the document_data table.
+    Stores each chunk into the `document_data` table with relevant metadata.
     """
     db: Session = SessionLocal()
     try:
@@ -136,10 +90,9 @@ async def store_chunks_in_db(chunks, document_name, role):
                 role=role,
             )
             db.add(record)
-
         db.commit()
     except Exception as e:
         db.rollback()
-        raise RuntimeError(f"DB insert error: {e}")
+        raise RuntimeError(f"Database error: {e}")
     finally:
         db.close()
