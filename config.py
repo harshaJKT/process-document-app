@@ -1,3 +1,3 @@
 # Simple configuration
-DATABASE_URL = "postgresql://postgres:password@localhost:5432/assignment"
+DATABASE_URL = "postgresql://aman:amanreza@localhost:5432/my_database"
 UPLOAD_DIR = "uploads"
