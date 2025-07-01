@@ -4,9 +4,9 @@ import os
 import asyncio
 import aiofiles
 from sqlalchemy.orm import Session
-from app.database import SessionLocal
+from app.database import SessionLocal 
 from app.models import DocumentData
-
+from io import BytesIO
 
 async def process_document(message):
     """
@@ -25,10 +25,12 @@ async def process_document(message):
     print(f"[Worker] Processing file: {original_name} at {file_path}")
 
     # TODO: Read file content
-
+    content = await read_file_content(file_path)
     # TODO: Chunk content
+    chunks = await chunk_content(content)
 
     # TODO: Store chunks in database
+    await store_chunks_in_db(chunks,original_name,role)
     # store_chunks_in_db(chunks, document_name, role)
 
     print(f"[Worker] Completed processing: {original_name}")
@@ -41,22 +43,71 @@ async def read_file_content(file_path):
     - Return file content as string
     """
 
+    data = None
+    async with aiofiles.open(file_path,'rb') as f:
+        data = await f.read()
 
-async def chunk_content(content):
+    reader = PyPDF2.PdfReader(BytesIO(data))
+    content = "\n".join([page.extract_text() or "" for page in reader.pages])
+    return content
+
+
+
+async def chunk_content(content : str):
     """
     TODO: Implement content chunking logic
     - Split content into paragraphs or pages
     - Ensure size of each chunk is < 100 characters and > 10 characters
     - Return list of chunks
     """
-    pass  # TODO: Implement content chunking logic
+    # TODO: Implement content chunking logic
+    chunks : list[str] = []
+    paragraphs = content.split("\n")
+
+    for para in paragraphs:
+        para = para.strip()
+
+        while len(para) > 100:
+            part = para[:100]
+            split_idx = part.rfind(" ")
+            if split_idx > 10:
+                part = para[:split_idx]
+                para = para[split_idx:].strip()
+            else :
+                part = para[:100]
+                para = para[100:].strip()
+            chunks.append(part)
+
+        if 10 < len(para) < 100:
+            chunks.append(para)
+    
+    return chunks
 
 
-async def store_chunks_in_db(chunks, document_name, role):
+async def store_chunks_in_db(chunks : list[str], document_name : str, role : str):
     """
     TODO: Implement database storage logic
     - Create database session
     - For each chunk, create DocumentData record with chunk_number
     - Commit to database
     """
-    pass  # TODO: Implement database storage logic
+    # TODO: Implement database storage logic
+
+    try:
+        db : Session = SessionLocal()
+
+        db_chunks = [DocumentData(
+            chunk_id=uuid.uuid4(),
+            document_name=document_name,
+            role=role,
+            chunk_number=chunk_number,
+            chunk_content=chunk
+        ) for chunk_number,chunk in enumerate(chunks,start=1)]
+
+        db.add_all(db_chunks)
+        db.commit()
+    
+    finally:
+        db.close()
+
+
