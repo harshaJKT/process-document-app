@@ -8,6 +8,10 @@ from app.database import SessionLocal
 from app.models import DocumentData
 from io import BytesIO
 
+MIN_CHAR = 10
+MAX_CHAR = 100
+# comment
+
 async def process_document(message):
     """
     TODO: Implement document processing logic
@@ -67,22 +71,26 @@ async def chunk_content(content : str):
     for para in paragraphs:
         para = para.strip()
 
-        while len(para) > 100:
-            part = para[:100]
+        while len(para) > MAX_CHAR:
+            part = para[:MAX_CHAR]
             split_idx = part.rfind(" ")
-            if split_idx > 10:
+            if split_idx > MIN_CHAR:
                 part = para[:split_idx]
                 para = para[split_idx:].strip()
             else :
-                part = para[:100]
-                para = para[100:].strip()
+                part = para[:MAX_CHAR]
+                para = para[MAX_CHAR:].strip()
             chunks.append(part)
 
-        if 10 < len(para) < 100:
+        if MIN_CHAR < len(para) < MAX_CHAR:
             chunks.append(para)
     
     return chunks
 
+
+async def add_keywords_in_chunks(chunks : list[str]) -> list[str]:
+    # TODO add keywords in chunks
+    pass
 
 async def store_chunks_in_db(chunks : list[str], document_name : str, role : str):
     """
