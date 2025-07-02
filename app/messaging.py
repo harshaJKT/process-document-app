@@ -1,5 +1,8 @@
 import asyncio
 
+#
+# { "doc_uploaded" : [msg]  }
+#
 
 class MessageBroker:
     def __init__(self):
