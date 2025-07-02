@@ -35,7 +35,7 @@ async def process_document(message):
     chunks = await chunk_content(content)
     print(f"[Worker] Chunks : chunks")
 
-    #add keyword and summary here
+    # add keyword and summary here
     enriched_chunks = await enrich_chunks_with_llm(chunks)
     print(f"[Worker] Enriched Chuncks : {enriched_chunks}")
 
