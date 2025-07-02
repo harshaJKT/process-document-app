@@ -12,6 +12,8 @@ MIN_CHAR = 10
 MAX_CHAR = 100
 # comment
 # comment 2
+# comment 3
+# comment 4
 
 async def process_document(message):
     """
