@@ -27,11 +27,7 @@ class UserRoleResponse(BaseModel):
 @router.post("/user-role", response_model=UserRoleResponse, status_code=201)
 def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
     """
-    TODO: Implement POST /user-role
-    - Create new user-role mapping
-    - Generate UUID for id
-    - Save to user_role_map table
-    - Return created mapping
+    Create new user-role mapping
     """
     try:
         # TODO: Create new UserRoleMap instance
@@ -59,9 +55,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
 @router.get("/user-role", response_model=list[UserRoleResponse])
 def get_all_user_roles(db: Session = Depends(get_db)):
     """
-    TODO: Implement GET /user-role
-    - Query all user-role mappings from database
-    - Return list of all mappings
+    Query all user-role mappings from database
     """
     try:
         # TODO: Query all UserRoleMap records

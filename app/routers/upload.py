@@ -8,7 +8,7 @@ import aiofiles
 
 router = APIRouter()
 
-
+# adding routes
 @router.post("/upload", status_code=201)
 async def upload_document(
     file: UploadFile = File(...), role: str = Form(default="Default Role")
