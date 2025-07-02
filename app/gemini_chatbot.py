@@ -1,5 +1,4 @@
-# gemini_client.py
-
+import config
 import google.generativeai as genai
 
 class GeminiClient:
@@ -7,7 +6,7 @@ class GeminiClient:
         """
         Initializes the Gemini client with a specific model.
         """
-        genai.configure(api_key="AIzaSyBlGBNJp6B4fec6AmhfvJRc2VndDyLy9Ec")
+        genai.configure(api_key=config.GEMINI_API_KEY)
         self.model = genai.GenerativeModel(model)
 
     def chat(self, prompt: str) -> str:
