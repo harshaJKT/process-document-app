@@ -8,6 +8,8 @@ from app.database import SessionLocal
 from app.database import get_db
 from app.models import DocumentData
 from fastapi import Depends
+import ollama
+from app.utils import chat
 
 
 def divide_into_chunks(content,chunk_size)->list:
@@ -24,6 +26,7 @@ async def process_document(message):
     """
 
     # These keys should be present in the message while publishing the message to the topic.
+    print(message)
     file_path = message["file_path"]
     original_name = message["original_name"]
     role = message.get("role_required", "Analyst")
@@ -51,7 +54,7 @@ async def read_file_content(file_path):
     """
     try:
         text = ""
-        
+        print(file_path)
         with open(file_path,'rb') as file:
             reader = PyPDF2.PdfReader(file)
             for page in reader.pages:
@@ -61,9 +64,6 @@ async def read_file_content(file_path):
             return text
     except Exception as e:
         raise e
-
-    
-
 
 async def chunk_content(content):
     """
@@ -78,7 +78,6 @@ async def chunk_content(content):
     return chunks
 
 
-
 async def store_chunks_in_db(chunks, document_name, role):
     """
     TODO: Implement database storage logic
@@ -89,10 +88,11 @@ async def store_chunks_in_db(chunks, document_name, role):
     pass  # TODO: Implement database storage logic
     db:Session = SessionLocal()
     try:
-
         chunk_number = 1
         for chunk in chunks:
-            record = DocumentData(document_name = document_name , chunk_number = chunk_number , chunk_content = chunk , role = role)
+            keywords = chat.get_keywords_from_ollama(chunk)
+            summary = chat.get_summary_from_ollama(chunk)
+            record = DocumentData(document_name = document_name , chunk_number = chunk_number , chunk_content = chunk , role = role,keywords = keywords,summary = summary)
             chunk_number+=1
             db.add(record)
         

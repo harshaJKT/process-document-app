@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Text, Integer
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID,ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 import uuid
 
@@ -14,6 +14,8 @@ class DocumentData(Base):
     chunk_number = Column(Integer, nullable=False)
     chunk_content = Column(Text, nullable=False)
     role = Column(Text, nullable=False)
+    keywords = Column(ARRAY(Text),nullable=False)
+    summary=Column(Text,nullable=False)
 
 
 class UserRoleMap(Base):
