@@ -4,8 +4,15 @@ import os
 import asyncio
 import aiofiles
 from sqlalchemy.orm import Session
+from app.chat_prompt import get_prompt
 from app.database import SessionLocal
 from app.models import DocumentData
+from app.ollama_chatbot import OllamaChatbot  
+from app.gemini_chatbot import GeminiClient
+
+
+# chatbot = OllamaChatbot()
+chatbot = GeminiClient()
 
 
 async def process_document(message):
@@ -86,14 +93,21 @@ async def store_chunks_in_db(chunks, document_name, role):
     db: Session = SessionLocal()
     try:
         for idx, chunk in enumerate(chunks):
+            keyword_prompt = get_prompt("keyword")
+            summary_prompt = get_prompt("summary")
+            keywords = chatbot.chat(keyword_prompt(chunk))
+            summary = chatbot.chat(summary_prompt(chunk))
             record = DocumentData(
                 chunk_id=uuid.uuid4(),
                 document_name=document_name,
                 chunk_number=idx + 1,
                 chunk_content=chunk,
+                keywords=keywords,
+                summary=summary,
                 role=role,
             )
             db.add(record)
+            print(keywords, summary)
         db.commit()
         print(f"[DB] Stored {len(chunks)} chunks for {document_name}")
     except Exception as e:

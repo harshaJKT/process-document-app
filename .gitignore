@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 
+uploads/
 # Virtual environment
 venv/
 
