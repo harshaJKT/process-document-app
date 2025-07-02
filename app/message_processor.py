@@ -7,13 +7,10 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal 
 from app.models import DocumentData
 from io import BytesIO
+from app.utils.llm_chat import ask_llm
 
 MIN_CHAR = 10
 MAX_CHAR = 100
-# comment
-# comment 2
-# comment 3
-# comment 4
 
 async def process_document(message):
     """
@@ -33,13 +30,17 @@ async def process_document(message):
 
     # TODO: Read file content
     content = await read_file_content(file_path)
+    print(f"[Worker] Content : content")
     # TODO: Chunk content
     chunks = await chunk_content(content)
+    print(f"[Worker] Chunks : chunks")
 
-    #add keyword and summary here
+    # add keyword and summary here
+    enriched_chunks = await enrich_chunks_with_llm(chunks)
+    print(f"[Worker] Enriched Chuncks : {enriched_chunks}")
 
     # TODO: Store chunks in database
-    await store_chunks_in_db(chunks,original_name,role)
+    await store_chunks_in_db(enriched_chunks,original_name,role)
     # store_chunks_in_db(chunks, document_name, role)
 
     print(f"[Worker] Completed processing: {original_name}")
@@ -62,65 +63,85 @@ async def read_file_content(file_path):
 
 
 
-async def chunk_content(content : str):
+async def chunk_content(content: str):
     """
-    TODO: Implement content chunking logic
-    - Split content into paragraphs or pages
-    - Ensure size of each chunk is < 100 characters and > 10 characters
-    - Return list of chunks
+    Split content into chunks:
+    - Each chunk has at least 100 words
+    - Each chunk ends at a sentence boundary (after a '.')
     """
-    # TODO: Implement content chunking logic
-    chunks : list[str] = []
-    paragraphs = content.split("\n")
-
-    for para in paragraphs:
-        para = para.strip()
-
-        while len(para) > MAX_CHAR:
-            part = para[:MAX_CHAR]
-            split_idx = part.rfind(" ")
-            if split_idx > MIN_CHAR:
-                part = para[:split_idx]
-                para = para[split_idx:].strip()
-            else :
-                part = para[:MAX_CHAR]
-                para = para[MAX_CHAR:].strip()
-            chunks.append(part)
-
-        if MIN_CHAR < len(para) < MAX_CHAR:
-            chunks.append(para)
+    MIN_WORDS = 100
+    chunks = []
+    words = content.split()
     
+    current_chunk = []
+    word_count = 0
+
+    for word in words:
+        current_chunk.append(word)
+        word_count += 1
+
+        if word.endswith('.') and word_count >= MIN_WORDS:
+            chunk_text = " ".join(current_chunk).strip()
+            chunks.append(chunk_text)
+            current_chunk = []
+            word_count = 0
+
+    # Add remaining words as the last chunk
+    if current_chunk:
+        chunks.append(" ".join(current_chunk).strip())
+
     return chunks
 
 
-async def add_keywords_in_chunks(chunks : list[str]) -> list[str]:
-    # TODO add keywords in chunks
-    pass
 
-async def store_chunks_in_db(chunks : list[str], document_name : str, role : str):
+async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
     """
-    TODO: Implement database storage logic
-    - Create database session
-    - For each chunk, create DocumentData record with chunk_number
-    - Commit to database
+    Processes each chunk with LLM to get keywords and summary.
+    Returns list of dicts: { "content": ..., "keywords": ..., "summary": ... }
     """
-    # TODO: Implement database storage logic
+    enriched = []
 
+    for chunk in chunks:
+        llm_response = ask_llm(
+            question="Generate 3 keywords and a 1-line summary.",
+            context=chunk,
+            response_format={
+                "keywords": ["k1", "k2", "k3"],
+                "summary": "one-line summary"
+            }
+        )
+        print(f"for chunk {chunk}, llm response:{llm_response}")
+        enriched.append({
+            "content": chunk,
+            "keywords": "\n".join(llm_response.get("keywords", [])),
+            "summary": llm_response.get("summary", "")
+        })
+
+    return enriched
+
+
+
+async def store_chunks_in_db(enriched_chunks: list[dict], document_name: str, role: str):
     try:
-        db : Session = SessionLocal()
+        db: Session = SessionLocal()
+        db_chunks = []
 
-        db_chunks = [DocumentData(
-            chunk_id=uuid.uuid4(),
-            document_name=document_name,
-            role=role,
-            chunk_number=chunk_number,
-            chunk_content=chunk
-        ) for chunk_number,chunk in enumerate(chunks,start=1)]
+        for chunk_number, item in enumerate(enriched_chunks, start=1):
+            db_chunks.append(DocumentData(
+                chunk_id=uuid.uuid4(),
+                document_name=document_name,
+                role=role,
+                chunk_number=chunk_number,
+                chunk_content=item["content"],
+                keywords=item["keywords"],
+                summary=item["summary"]
+            ))
 
         db.add_all(db_chunks)
         db.commit()
-    
+
     finally:
         db.close()
+
 
 
