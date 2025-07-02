@@ -36,6 +36,8 @@ async def process_document(message):
     # TODO: Chunk content
     chunks = await chunk_content(content)
 
+    #add keyword and summary here
+
     # TODO: Store chunks in database
     await store_chunks_in_db(chunks,original_name,role)
     # store_chunks_in_db(chunks, document_name, role)
