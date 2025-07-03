@@ -40,6 +40,12 @@ class UserRoleMap(Base):
     """
     __tablename__ = "user_role_map"
 
+<<<<<<< HEAD
     id: UUID = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username: str = Column(Text, nullable=False)
     role: str = Column(Text, nullable=False)
+=======
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user = Column(Text, nullable=False)
+    role = Column(Text, nullable=False)
+>>>>>>> bc971e13d5b1b09116ce0af9d451ddf4bbe10544
