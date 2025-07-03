@@ -30,7 +30,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
     """
     try:
         # TODO: Create new UserRoleMap instance
-        new_user_role = UserRoleMap(user=user_role.user, role=user_role.role)
+        new_user_role = UserRoleMap(uuser=user_role.user, role=user_role.role)
 
         # TODO: Add to database and commit
         db.add(new_user_role)
@@ -38,6 +38,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
         db.refresh(new_user_role)
 
         return UserRoleResponse(
+            id=str(new_user_role.id),
             user=user_role.user,
             role=user_role.role,
         )
@@ -48,18 +49,50 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
 @router.get("/user-role", response_model=list[UserRoleResponse])
 def get_all_user_roles(db: Session = Depends(get_db)):
     """
-    TODO: Implement GET /user-role
-    - Query all user-role mappings from database
-    - Return list of all mappings
+    Get all user-role mappings
     """
     try:
-        # TODO: Query all UserRoleMap records
+        roles = db.query(UserRoleMap).all()
+        return [UserRoleResponse(
+            id=str(role.id),
+            user=role.uuser,
+            role=role.role
+        ) for role in roles]
+    except Exception as e:
+        return {"error": str(e)}
+@router.patch("/user-role/{id}", response_model=UserRoleResponse)
+def update_user_role(id: str, updated_data: UserRoleCreate, db: Session = Depends(get_db)):
+    try:
+        role_entry = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+        if not role_entry:
+            return {"error": "User role not found"}
 
-        # TODO: Convert to response format
+        role_entry.user = updated_data.user
+        role_entry.role = updated_data.role
+        db.commit()
+        db.refresh(role_entry)
 
-        return []  # Placeholder
+        return UserRoleResponse(
+            id=str(role_entry.id),
+            user=role_entry.user,
+            role=role_entry.role
+        )
+    except Exception as e:
+        return {"error": str(e)}
+
+@router.delete("/user-role/{id}")
+def delete_user_role(id: str, db: Session = Depends(get_db)):
+    try:
+        role_entry = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+        if not role_entry:
+            return {"error": "User role not found"}
+
+        db.delete(role_entry)
+        db.commit()
+        return {"message": f"User role with id {id} deleted successfully"}
     except Exception as e:
         return {"error": str(e)}
 
 
 # TODO: Implement U and D of CRUD (Create, Read implemented above, Update and Delete to be implemented)
+ 
