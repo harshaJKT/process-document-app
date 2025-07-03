@@ -1,94 +1,123 @@
 import uuid
-import PyPDF2
 import os
 import asyncio
 import aiofiles
-from sqlalchemy.orm import Session
-from app.database import SessionLocal 
-from app.models import DocumentData
+import PyPDF2
 from io import BytesIO
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+
+from app.database import SessionLocal
+from app.models import DocumentData
 from app.utils.llm_chat import ask_llm
+from app.logger import setup_logger
 
-MIN_CHAR = 10
-MAX_CHAR = 100
+logger = setup_logger(f"[{__name__}] [Worker]")
 
-async def process_document(message):
+
+
+async def process_document(message: dict):
     """
-    TODO: Implement document processing logic
-    - Extract file_path and original_name from message
-    - Read file content (PDF/text)
-    - Chunk content into paragraphs/pages (min 4 chunks)
-    - Store each chunk in document_data table with chunk_number
+    Main document processing pipeline:
+    1. Extract file path, name, and role from message.
+    2. Read file content (PDF).
+    3. Chunk content into ~100-word blocks at sentence boundaries.
+    4. Enrich each chunk with keywords and summary using LLM.
+    5. Store enriched chunks in the database.
     """
+    try:
+        file_path = message["file_path"]
+        original_name = message["original_name"]
+        role = message.get("role_required", "Analyst")
+    except KeyError as e:
+        logger.error(f"Missing expected key in message: {e}")
+        return
 
-    # These keys should be present in the message while publishing the message to the topic.
-    file_path = message["file_path"]
-    original_name = message["original_name"]
-    role = message.get("role_required", "Analyst")
+    logger.info(f"Started processing: {original_name}")
 
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
+    try:
+        content = await read_file_content(file_path)
+        logger.info("File content read successfully.")
+    except Exception as e:
+        logger.exception(f"Failed to read file content: {e}")
+        return
 
-    # TODO: Read file content
-    content = await read_file_content(file_path)
-    print(f"[Worker] Content : content")
-    # TODO: Chunk content
     chunks = await chunk_content(content)
-    print(f"[Worker] Chunks : chunks")
+    if not chunks:
+        logger.warning("No chunks were created from the document.")
+        return
+    logger.info(f"Chunked content into {len(chunks)} blocks.")
 
-    # add keyword and summary here
     enriched_chunks = await enrich_chunks_with_llm(chunks)
-    print(f"[Worker] Enriched Chuncks : {enriched_chunks}")
+    logger.info(f"Enriched {len(enriched_chunks)} chunks with LLM.")
 
-    # TODO: Store chunks in database
-    await store_chunks_in_db(enriched_chunks,original_name,role)
-    # store_chunks_in_db(chunks, document_name, role)
+    try:
+        await store_chunks_in_db(enriched_chunks, original_name, role)
+        logger.info(f"Stored chunks for '{original_name}' in database.")
+    except Exception as e:
+        logger.error(f"Failed to store chunks for '{original_name}': {e}")
+        return
 
-    print(f"[Worker] Completed processing: {original_name}")
+    logger.info(f"Completed processing: {original_name}")
 
 
-async def read_file_content(file_path):
+async def read_file_content(file_path: str) -> str:
     """
-    TODO: Implement file reading logic
-    - Support PDF files using PyPDF2
-    - Return file content as string
+    Reads PDF file content using PyPDF2.
+    - Opens file in binary mode asynchronously.
+    - Extracts and joins text from all pages.
     """
+    try:
+        async with aiofiles.open(file_path, 'rb') as f:
+            data = await f.read()
+    except FileNotFoundError:
+        logger.error(f"File not found: {file_path}")
+        raise
+    except Exception as e:
+        logger.error(f"Error reading file: {e}")
+        raise
 
-    data = None
-    async with aiofiles.open(file_path,'rb') as f:
-        data = await f.read()
-
-    reader = PyPDF2.PdfReader(BytesIO(data))
-    content = "\n".join([page.extract_text() or "" for page in reader.pages])
-    return content
-
+    try:
+        reader = PyPDF2.PdfReader(BytesIO(data))
+        return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception as e:
+        logger.error(f"Error parsing PDF content: {e}")
+        raise
 
 
-async def chunk_content(content: str):
+async def chunk_content(content: str) -> list[str]:
     """
-    Split content into chunks:
-    - Each chunk has at least 100 words
-    - Each chunk ends at a sentence boundary (after a '.')
+    Splits content into chunks based on character count.
+    - Each chunk is between 10 and 100 characters.
+    - Tries to split at sentence boundaries if possible (after '.').
+    - Returns list of clean text chunks.
     """
-    MIN_WORDS = 100
+    MIN_CHARS = 10
+    MAX_CHARS = 100
+
+    sentences = content.replace('\n', ' ').split('.')  # split by sentence
     chunks = []
-    words = content.split()
-    
-    current_chunk = []
-    word_count = 0
+    current_chunk = ""
 
-    for word in words:
-        current_chunk.append(word)
-        word_count += 1
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
 
-        if word.endswith('.') and word_count >= MIN_WORDS:
-            chunk_text = " ".join(current_chunk).strip()
-            chunks.append(chunk_text)
-            current_chunk = []
-            word_count = 0
+        # Add period back to sentence
+        sentence += '.'
 
-    # Add remaining words as the last chunk
-    if current_chunk:
-        chunks.append(" ".join(current_chunk).strip())
+        # If adding this sentence keeps us under limit
+        if len(current_chunk) + len(sentence) <= MAX_CHARS:
+            current_chunk += ' ' + sentence if current_chunk else sentence
+        else:
+            if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
+                chunks.append(current_chunk.strip())
+            current_chunk = sentence
+
+    # Final leftover chunk
+    if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
+        chunks.append(current_chunk.strip())
 
     return chunks
 
@@ -96,52 +125,69 @@ async def chunk_content(content: str):
 
 async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
     """
-    Processes each chunk with LLM to get keywords and summary.
-    Returns list of dicts: { "content": ..., "keywords": ..., "summary": ... }
+    Enriches each chunk with keywords and a summary using LLM.
+    - Handles individual chunk failures gracefully.
+    - Returns a list of dicts with: content, keywords, summary.
     """
     enriched = []
 
-    for chunk in chunks:
-        llm_response = ask_llm(
-            question="Generate 3 keywords and a 1-line summary.",
-            context=chunk,
-            response_format={
-                "keywords": ["k1", "k2", "k3"],
-                "summary": "one-line summary"
-            }
-        )
-        print(f"for chunk {chunk}, llm response:{llm_response}")
-        enriched.append({
-            "content": chunk,
-            "keywords": "\n".join(llm_response.get("keywords", [])),
-            "summary": llm_response.get("summary", "")
-        })
+    for i, chunk in enumerate(chunks, start=1):
+        try:
+            llm_response = await ask_llm(
+                question="Generate exactly 2 keywords per sentence in the chunk and a summary in single sentence.",
+                context=chunk,
+                response_format={
+                    "keywords": ["k1", "k2", "k3"],
+                    "summary": "one-line summary"
+                }
+            )
+            enriched.append({
+                "content": chunk,
+                "keywords": ",".join(llm_response.get("keywords", [])),
+                "summary": llm_response.get("summary", "")
+            })
+            logger.info(f"LLM enrichment done for chunk #{i}")
+        except Exception as e:
+            logger.error(f"LLM enrichment failed for chunk #{i}: {e}")
+            enriched.append({
+                "content": chunk,
+                "keywords": "",
+                "summary": ""
+            })
 
     return enriched
 
 
-
 async def store_chunks_in_db(enriched_chunks: list[dict], document_name: str, role: str):
+    """
+    Stores enriched chunks into the document_data table.
+    - Commits all chunks in a single transaction.
+    - Handles and logs database errors.
+    """
+    db: Session = SessionLocal()
     try:
-        db: Session = SessionLocal()
-        db_chunks = []
-
-        for chunk_number, item in enumerate(enriched_chunks, start=1):
-            db_chunks.append(DocumentData(
+        db_chunks = [
+            DocumentData(
                 chunk_id=uuid.uuid4(),
                 document_name=document_name,
                 role=role,
-                chunk_number=chunk_number,
+                chunk_number=i + 1,
                 chunk_content=item["content"],
-                keywords=item["keywords"],
-                summary=item["summary"]
-            ))
+                keywords=item.get("keywords", ""),
+                summary=item.get("summary", "")
+            )
+            for i, item in enumerate(enriched_chunks)
+        ]
 
         db.add_all(db_chunks)
         db.commit()
-
+    except SQLAlchemyError as db_err:
+        db.rollback()
+        logger.exception(f"Database error while storing chunks: {db_err}")
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.exception(f"Unexpected error during DB insert: {e}")
+        raise
     finally:
         db.close()
-
-
-

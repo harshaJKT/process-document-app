@@ -1,47 +1,56 @@
 from fastapi import APIRouter, UploadFile, File, Form
-import shutil
 import os
 import uuid
-from app.messaging import broker
-import config
 import aiofiles
 
-router = APIRouter()
+from app.messaging import broker
+from app.logger import setup_logger
+import config
 
-# adding routes
+router = APIRouter()
+logger = setup_logger(f"[{__name__}]")
+
+
 @router.post("/upload", status_code=201)
 async def upload_document(
-    file: UploadFile = File(...), role: str = Form(default="Default Role")
+    file: UploadFile = File(...),
+    role: str = Form(default="Default Role")
 ):
     """
-    TODO: Implement file upload logic
-    - Create unique file name using uuid
-    - Save file to uploads directory
-    - Publish message to doc_uploaded topic
-    - Return success response
+    Uploads a document and queues it for background processing.
+    
+    Steps:
+    1. Generate a unique filename.
+    2. Save the file to the uploads directory.
+    3. Publish a message with file details to the 'doc_uploaded' topic.
+    4. Return a success response with file path and role.
     """
     try:
-        # TODO: Save file locally
         os.makedirs(config.UPLOAD_DIR, exist_ok=True)
-        file_path = os.path.join(config.UPLOAD_DIR,file.filename)
-        async with aiofiles.open(file_path,'wb') as f:
+
+        # Generate unique filename to avoid collisions
+        file_path = os.path.join(config.UPLOAD_DIR, file.filename)
+
+        # Save the file asynchronously
+        async with aiofiles.open(file_path, 'wb') as f:
             await f.write(await file.read())
-        # TODO: Publish message to topic for processing
-        # Messaging is already implemented in the messaging.py file, refer to it and use it.
-        # Think of all the keys that should be present in the message while publishing the message to the topic.
-        # Use: await broker.publish("doc_uploaded", message)
+
+        # Prepare message for processing
         message = {
-            "file_path" : file_path,
-            "original_name" : file.filename,
-            "role_required" : role,
+            "file_path": file_path,
+            "original_name": file.filename,
+            "role_required": role,
         }
-        await broker.publish("doc_uploaded",message)
+
+        await broker.publish("doc_uploaded", message)
+        logger.info(f"Uploaded and queued file: {file.filename} for role '{role}'")
 
         return {
             "message": "File uploaded and queued for processing",
-            "file_path": file_path,  # TODO: file_path
+            "file_path": file_path,
             "role": role,
         }
 
     except Exception as e:
+        logger.exception("File upload failed")
         return {"error": str(e)}
