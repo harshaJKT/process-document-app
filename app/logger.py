@@ -11,7 +11,7 @@ def setup_logger(name: str) -> logging.Logger:
         handler = logging.StreamHandler()
          # Format only LEVELNAME with color
         formatter = ColoredFormatter(
-            fmt="%(asctime)s - %(log_color)s%(levelname)-8s%(reset)s: %(message)s",
+            fmt="%(name)s - %(log_color)s%(levelname)-8s%(reset)s: %(message)s",
             log_colors={
                 "DEBUG": "cyan",
                 "INFO": "green",

@@ -8,7 +8,7 @@ from app.logger import setup_logger
 import config
 
 router = APIRouter()
-logger = setup_logger(__name__)
+logger = setup_logger(f"[{__name__}]")
 
 
 @router.post("/upload", status_code=201)
@@ -29,8 +29,7 @@ async def upload_document(
         os.makedirs(config.UPLOAD_DIR, exist_ok=True)
 
         # Generate unique filename to avoid collisions
-        unique_name = f"{uuid.uuid4()}_{file.filename}"
-        file_path = os.path.join(config.UPLOAD_DIR, unique_name)
+        file_path = os.path.join(config.UPLOAD_DIR, file.filename)
 
         # Save the file asynchronously
         async with aiofiles.open(file_path, 'wb') as f:
@@ -44,7 +43,7 @@ async def upload_document(
         }
 
         await broker.publish("doc_uploaded", message)
-        logger.info(f"Uploaded and queued file: {file.filename} (as {unique_name}) for role '{role}'")
+        logger.info(f"Uploaded and queued file: {file.filename} for role '{role}'")
 
         return {
             "message": "File uploaded and queued for processing",

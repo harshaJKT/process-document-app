@@ -12,7 +12,8 @@ from app.models import DocumentData
 from app.utils.llm_chat import ask_llm
 from app.logger import setup_logger
 
-logger = setup_logger(__name__)
+logger = setup_logger(f"[{__name__}] [Worker]")
+
 
 
 async def process_document(message: dict):
@@ -86,26 +87,40 @@ async def read_file_content(file_path: str) -> str:
 
 async def chunk_content(content: str) -> list[str]:
     """
-    Splits content into chunks of ~100 words, ending at sentence boundaries.
-    - Ensures each chunk ends at a '.' and contains at least 100 words.
-    - Appends remaining text as a final chunk.
+    Splits content into chunks based on character count.
+    - Each chunk is between 10 and 100 characters.
+    - Tries to split at sentence boundaries if possible (after '.').
+    - Returns list of clean text chunks.
     """
-    MIN_WORDS = 100
-    chunks, current_chunk = [], []
-    word_count = 0
+    MIN_CHARS = 10
+    MAX_CHARS = 100
 
-    for word in content.split():
-        current_chunk.append(word)
-        word_count += 1
+    sentences = content.replace('\n', ' ').split('.')  # split by sentence
+    chunks = []
+    current_chunk = ""
 
-        if word.endswith('.') and word_count >= MIN_WORDS:
-            chunks.append(" ".join(current_chunk).strip())
-            current_chunk, word_count = [], 0
+    for sentence in sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
 
-    if current_chunk:
-        chunks.append(" ".join(current_chunk).strip())
+        # Add period back to sentence
+        sentence += '.'
+
+        # If adding this sentence keeps us under limit
+        if len(current_chunk) + len(sentence) <= MAX_CHARS:
+            current_chunk += ' ' + sentence if current_chunk else sentence
+        else:
+            if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
+                chunks.append(current_chunk.strip())
+            current_chunk = sentence
+
+    # Final leftover chunk
+    if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
+        chunks.append(current_chunk.strip())
 
     return chunks
+
 
 
 async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
@@ -119,7 +134,7 @@ async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
     for i, chunk in enumerate(chunks, start=1):
         try:
             llm_response = await ask_llm(
-                question="Generate 3 keywords and a 1-line summary.",
+                question="Generate exactly 2 keywords per sentence in the chunk and a summary in single sentence.",
                 context=chunk,
                 response_format={
                     "keywords": ["k1", "k2", "k3"],
@@ -131,6 +146,7 @@ async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
                 "keywords": ",".join(llm_response.get("keywords", [])),
                 "summary": llm_response.get("summary", "")
             })
+            logger.info(f"LLM enrichment done for chunk #{i}")
         except Exception as e:
             logger.error(f"LLM enrichment failed for chunk #{i}: {e}")
             enriched.append({
