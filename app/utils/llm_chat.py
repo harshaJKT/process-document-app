@@ -3,29 +3,39 @@ import asyncio
 import ollama
 import config
 
+import json
+import re
 
 def safe_json_parse(raw: str) -> dict:
     """
     Safely parse JSON from raw LLM response.
-    - Tries direct parsing.
-    - Attempts to extract JSON between first { and last }.
-    - Appends missing closing brace if needed.
+    Handles:
+    - Direct JSON parsing
+    - Extraction from first '{' to last '}'
+    - Appends missing '}'
+    - Removes trailing commas before '}' or ']'
     """
+    def clean_trailing_commas(json_str: str) -> str:
+        # Remove trailing commas before } or ]
+        return re.sub(r',\s*(?=[}\]])', '', json_str)
+
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
         start = raw.find("{")
         end = raw.rfind("}")
-        
+
         if start == -1:
             raise ValueError(f"No JSON object found in response: {raw}")
 
         json_str = raw[start:end + 1] if end != -1 else raw[start:].strip() + "}"
+        json_str = clean_trailing_commas(json_str)
 
         try:
             return json.loads(json_str)
         except json.JSONDecodeError as e:
-            raise ValueError(f"Failed to parse extracted JSON: {json_str}") from e
+            raise ValueError(f"Failed to parse cleaned JSON: {json_str}") from e
+
 
 
 async def ask_llm(question: str, context: str, response_format: dict) -> dict:

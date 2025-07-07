@@ -15,8 +15,6 @@ router = APIRouter()
 class QueryRequest(BaseModel):
     query: str
     user: str
-    document_name: str
-
 
 # --- Sub-Functions ---
 
@@ -27,18 +25,6 @@ def get_user_role(db: Session, username: str) -> str:
     return db.scalar(
         select(UserRoleMap.role).where(UserRoleMap.username == username)
     )
-
-
-# def get_chunks_by_role_and_doc(db: Session, doc_name: str, role: str) -> list[str]:
-#     """
-#     Retrieve all document chunks for a given document and user role.
-#     """
-#     return db.execute(
-#         select(DocumentData.chunk_content)
-#         .where(DocumentData.document_name == doc_name)
-#         .where(DocumentData.role == role)
-#     ).scalars().all()
-
 
 async def extract_keywords(query: str) -> list[str]:
     """
@@ -52,14 +38,13 @@ async def extract_keywords(query: str) -> list[str]:
     return response.get("keywords", [])
 
 
-def filter_chunks_by_keywords(db: Session, doc_name: str, role: str, keywords: list[str]) -> list[str]:
+def filter_chunks_by_keywords(db: Session, role: str, keywords: list[str]) -> list[str]:
     """
     Filter document chunks that match any of the extracted keywords.
     """
     keyword_filters = [DocumentData.chunk_content.ilike(f"%{kw}%") for kw in keywords]
     return db.execute(
         select(DocumentData.chunk_content)
-        .where(DocumentData.document_name == doc_name)
         .where(DocumentData.role == role)
         .where(or_(*keyword_filters))
     ).scalars().all()
@@ -88,19 +73,12 @@ async def handle_query(request: QueryRequest, db: Session = Depends(get_db)):
     - Filters chunks with those keywords
     - Uses LLM to answer the query based on filtered context
     """
-    logger.info(f"Received query request: user={request.user}, document={request.document_name}")
-
+    
     role = get_user_role(db, request.user)
     if not role:
         logger.warning(f"Role not found for user: {request.user}")
         raise HTTPException(status_code=403, detail="User role not found")
     logger.info(f"Retrieved role '{role}' for user '{request.user}'")
-
-    # chunks = get_chunks_by_role_and_doc(db, request.document_name, role)
-    # if not chunks:
-    #     logger.warning(f"No chunks found for document '{request.document_name}' and role '{role}'")
-    #     raise HTTPException(status_code=404, detail="No document chunks found for user role")
-    # logger.info(f"Fetched {len(chunks)} chunks for document '{request.document_name}' and role '{role}'")
 
     keywords = await extract_keywords(request.query)
     if not keywords:
@@ -108,7 +86,7 @@ async def handle_query(request: QueryRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Keyword extraction failed")
     logger.info(f"Extracted keywords: {keywords}")
 
-    filtered_chunks = filter_chunks_by_keywords(db, request.document_name, role, keywords)
+    filtered_chunks = filter_chunks_by_keywords(db, role, keywords)
     if not filtered_chunks:
         logger.warning(f"No matching chunks found for keywords: {keywords}")
         raise HTTPException(status_code=404, detail="No matching chunks found for keywords")
