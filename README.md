@@ -81,17 +81,6 @@ uvicorn app.main:app --reload
 http://localhost:8000/retrieve?role=admin&question=What%20is%20IoT%3F
 ```
 
-#### Example using Python (requests):
-```python
-import requests
-url = "http://localhost:8000/retrieve"
-params = {"role": "admin", "question": "What is IoT?"}
-response = requests.get(url, params=params)
-print(response.json())
-```
-
-- The API will return a JSON answer based on the document content and extracted keywords.
-
 ### User Role Management
 - Use `/user-role` endpoints to manage user roles.
 
@@ -102,11 +91,6 @@ print(response.json())
 - The app uses background processing for document chunking and LLM calls.
 - For large documents, only relevant chunks are used for answering questions.
 
----
 
-## Troubleshooting
-- If you get a 404 on `/retrieve`, make sure the router is included in `main.py`.
-- If Ollama is not responding, check that the server is running and the model is pulled.
-- For database errors, verify your schema matches the models.
 
 
