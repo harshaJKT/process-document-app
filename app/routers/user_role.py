@@ -4,7 +4,6 @@ from app.database import get_db
 from app.models import UserRoleMap
 import uuid
 from pydantic import BaseModel
-from fastapi import HTTPException
 
 router = APIRouter()
 
@@ -39,12 +38,11 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
         db.refresh(new_user_role)
 
         return UserRoleResponse(
-            id=str(new_user_role.id),
             user=user_role.user,
             role=user_role.role,
         )
     except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}
 
 
 @router.get("/user-role", response_model=list[UserRoleResponse])
@@ -56,11 +54,12 @@ def get_all_user_roles(db: Session = Depends(get_db)):
     """
     try:
         # TODO: Query all UserRoleMap records
-        user_roles = db.query(UserRoleMap).all()
+
         # TODO: Convert to response format
-        return [UserRoleResponse(id=str(ur.id), user=ur.user, role=ur.role) for ur in user_roles]
+
+        return []  # Placeholder
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"error": str(e)}
 
 
 # TODO: Implement U and D of CRUD (Create, Read implemented above, Update and Delete to be implemented)

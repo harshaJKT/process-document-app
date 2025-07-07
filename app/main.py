@@ -1,13 +1,12 @@
 from fastapi import FastAPI
 from app.subscriber import start_subscriber
-from app.routers import upload, user_role, retrieval
+from app.routers import upload, user_role
 
 app = FastAPI()
 
 # Include routers
 app.include_router(upload.router, tags=["File Upload"])
 app.include_router(user_role.router, tags=["User Role Management"])
-app.include_router(retrieval.router, tags=["Retrieval"])
 
 
 @app.on_event("startup")
