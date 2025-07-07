@@ -1,3 +1,11 @@
-# Simple configuration
-DATABASE_URL = "postgresql://sajan:jktech@localhost:5432/document_db"
-UPLOAD_DIR = "uploads"
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads") 
+
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL is missing in .env")

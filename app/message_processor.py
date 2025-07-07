@@ -3,49 +3,38 @@ import PyPDF2
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import DocumentData
-
+from app.together_client import generate_keywords_and_summary
 
 def divide_into_chunks(content: str, chunk_size: int = 50) -> list[str]:
-    """
-    Splits the content into chunks of specified size.
-    Each chunk should be between 10 and 100 characters ideally.
-    """
+    """Splits the content into chunks of specified size."""
     return [
         content[i:i + chunk_size]
         for i in range(0, len(content), chunk_size)
         if 10 < len(content[i:i + chunk_size]) <= 100
     ]
 
-
 async def process_document(message: dict):
-    """
-    Handles the document processing pipeline:
-    - Reads the PDF file
-    - Chunks the content
-    - Stores chunks in the database
-    """
+    """Handles the document processing pipeline."""
     file_path = message["file_path"]
     original_name = message["original_filename"]
     role = message.get("role", "Analyst")
 
     print(f"[Worker] Processing file: {original_name} at {file_path}")
 
-    # Step 1: Read PDF content
+    print("[DEBUG] Reading file content...")
     content = await read_file_content(file_path)
+    print("[DEBUG] Completed reading content.")
 
-    # Step 2: Split into chunks
+    print("[DEBUG] Chunking content...")
     chunks = await chunk_content(content)
+    print(f"[DEBUG] Created {len(chunks)} chunks.")
 
-    # Step 3: Store each chunk in DB
+    print("[DEBUG] Storing chunks to DB...")
     await store_chunks_in_db(chunks, original_name, role)
-
-    print(f"[Worker] Completed processing: {original_name}")
-
+    print("[DEBUG] Stored chunks successfully.")
 
 async def read_file_content(file_path: str) -> str:
-    """
-    Extracts text content from a PDF file using PyPDF2.
-    """
+    """Extracts text content from a PDF file using PyPDF2."""
     try:
         text = ""
         with open(file_path, "rb") as file:
@@ -58,11 +47,8 @@ async def read_file_content(file_path: str) -> str:
     except Exception as e:
         raise RuntimeError(f"Error reading PDF: {e}")
 
-
 async def chunk_content(content: str) -> list[str]:
-    """
-    Splits content into chunks (between 10–100 characters). Ensures at least 4 chunks.
-    """
+    """Splits content into chunks (between 10–100 characters). Ensures at least 4 chunks."""
     chunks = divide_into_chunks(content, chunk_size=50)
 
     if len(chunks) < 4:
@@ -74,20 +60,23 @@ async def chunk_content(content: str) -> list[str]:
 
     return chunks
 
-
 async def store_chunks_in_db(chunks: list[str], document_name: str, role: str):
-    """
-    Stores each chunk into the `document_data` table with relevant metadata.
-    """
+    """Stores each chunk into the `document_data` table with keywords & summary."""
     db: Session = SessionLocal()
     try:
         for idx, chunk in enumerate(chunks):
+            print(f"[DEBUG] Generating keywords & summary for chunk {idx+1}...")
+            keywords, summary = await generate_keywords_and_summary(chunk)
+            print(f"[DEBUG] Got keywords and summary for chunk {idx+1}.")
+
             record = DocumentData(
-                chunk_id=uuid.uuid4(),
+                chunk_id=str(uuid.uuid4()),
                 document_name=document_name,
                 chunk_number=idx + 1,
                 chunk_content=chunk,
                 role=role,
+                keywords=keywords,
+                summary=summary
             )
             db.add(record)
         db.commit()
