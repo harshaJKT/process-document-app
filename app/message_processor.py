@@ -5,6 +5,7 @@ import asyncio
 import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
+from app.llm_utils import extract_summary_keywords
 from app.models import DocumentData
 import re
  
@@ -96,12 +97,25 @@ async def store_chunks_in_db(chunks, document_name, role):
     - Commit to database
     """
     db:Session=SessionLocal()
-    for idx,chunk in enumerate(chunks):
-        doc_data=DocumentData(
-            document_name=document_name,
-            chunk_number=idx+1,
-            chunk_content=chunk,
-            role=role
-        )
-        db.add(doc_data)
-    db.commit()
+    try:
+        tasks = [extract_summary_keywords(chunk) for chunk in chunks]
+        summaries_keywords = await asyncio.gather(*tasks)
+
+        for idx, chunk in enumerate(chunks):
+            summary, keywords = summaries_keywords[idx]
+            doc_data = DocumentData(
+                document_name=document_name,
+                chunk_number=idx + 1,
+                chunk_content=chunk,
+                role=role,
+                summary=summary,
+                keywords=keywords,
+            )
+            db.add(doc_data)
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
