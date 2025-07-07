@@ -109,7 +109,4 @@ print(response.json())
 - If Ollama is not responding, check that the server is running and the model is pulled.
 - For database errors, verify your schema matches the models.
 
----
 
-## License
-MIT
