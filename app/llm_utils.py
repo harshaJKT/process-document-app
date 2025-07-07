@@ -1,4 +1,3 @@
-# app/llm_utils.py
 import json, asyncio, ollama
 from typing import Tuple, List
 
@@ -56,3 +55,46 @@ async def extract_summary_keywords(chunk: str) -> Tuple[str, List[str]]:
     summary  = await summary_task
     keywords = await keywords_task
     return summary, keywords
+
+
+
+async def extract_query_keywords(query: str) -> List[str]:
+    prompt = f"""
+    You are a helpful assistant.
+    Return 3‑6 keywords for this query as a single comma‑separated line.
+
+    Query: {query}
+    """
+    res = ollama.chat(
+        model="llama3.2:1b",
+        messages=[{"role": "user", "content": prompt}],
+        stream=False,
+    )
+    raw = res["message"]["content"].strip()
+    
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [k.strip() for k in data]
+    except json.JSONDecodeError:
+        pass
+    return [k.strip() for k in raw.split(",") if k.strip()]
+
+
+async def query_ollama(*, query: str, context: str) -> str:
+    prompt = f"""
+    You are an assistant. Use the context below to answer the question.
+
+    Context:
+    {context}
+
+    Question: {query}
+
+    Answer in a concise paragraph:
+    """
+    res = ollama.chat(
+        model="llama3.2:1b",
+        messages=[{"role": "user", "content": prompt}],
+        stream=False,
+    )
+    return res["message"]["content"].strip()
