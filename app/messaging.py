@@ -1,6 +1,5 @@
 import asyncio
 
-
 class MessageBroker:
     def __init__(self):
         self.topics = {}
