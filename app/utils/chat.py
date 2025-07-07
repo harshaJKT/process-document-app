@@ -41,5 +41,29 @@ def get_keywords_from_ollama(paragraph:str,model='llama3.2:1b')->str:
         ]
     )
 
-
     return ast.literal_eval(response["message"]["content"])
+
+def get_answer_from_para(paragraph:str,question:str,model = 'llama3.2:1b')->str:
+
+    prompt = """
+        You are a helpful AI assistant. Read the paragraph below and answer the following question based only on the information in the paragraph and dont include anything form outside the para.
+
+        Paragraph:
+        {paragraph}
+
+        Question:
+        {question}
+
+        Answer:"""
+
+    response = ollama.chat(
+        model = 'llama3.2:1b',
+        messages=[
+            {
+                'role':'user',
+                'content':prompt.format(paragraph = paragraph,question=question)
+            }
+        ]
+    )
+
+    return response['message']['content']
