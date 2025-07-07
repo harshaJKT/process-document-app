@@ -6,6 +6,7 @@ import PyPDF2
 from io import BytesIO
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import select
 
 from app.database import SessionLocal
 from app.models import DocumentData
@@ -35,31 +36,44 @@ async def process_document(message: dict):
 
     logger.info(f"Started processing: {original_name}")
 
-    try:
-        content = await read_file_content(file_path)
-        logger.info("File content read successfully.")
-    except Exception as e:
-        logger.exception(f"Failed to read file content: {e}")
+    if await check_document_exists(original_name, role):
+        logger.warning(f"Document '{original_name}' with role '{role}' already exists. Skipping processing.")
         return
 
+    content = await read_file_content(file_path)
+    logger.info("File content read successfully.")
+
     chunks = await chunk_content(content)
-    if not chunks:
-        logger.warning("No chunks were created from the document.")
-        return
     logger.info(f"Chunked content into {len(chunks)} blocks.")
 
     enriched_chunks = await enrich_chunks_with_llm(chunks)
     logger.info(f"Enriched {len(enriched_chunks)} chunks with LLM.")
 
-    try:
-        await store_chunks_in_db(enriched_chunks, original_name, role)
-        logger.info(f"Stored chunks for '{original_name}' in database.")
-    except Exception as e:
-        logger.error(f"Failed to store chunks for '{original_name}': {e}")
-        return
-
+    await store_chunks_in_db(enriched_chunks, original_name, role)
+    logger.info(f"Stored chunks for '{original_name}' in database.")
+    
     logger.info(f"Completed processing: {original_name}")
 
+
+async def check_document_exists(document_name: str, role: str) -> bool:
+    """
+    Check if a document with the same name and role already exists in the database.
+    Returns True if exists, else False.
+    """
+    db: Session = SessionLocal()
+    try:
+        result = db.execute(
+            select(DocumentData)
+            .where(DocumentData.document_name == document_name)
+            .where(DocumentData.role == role)
+            .limit(1)
+        ).first()
+        return result is not None
+    except Exception as e:
+        logger.error(f"Error checking document existence: {e}")
+        raise
+    finally:
+        db.close()
 
 async def read_file_content(file_path: str) -> str:
     """
