@@ -6,7 +6,7 @@ import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import DocumentData
-
+from app.ollama_client import ask_ollama
 
 async def process_document(message):
     """
@@ -85,12 +85,26 @@ async def store_chunks_in_db(chunks, document_name, role):
     """
     db:Session=SessionLocal()
     for idx,chunk in enumerate(chunks):
+        # Generate keywords
+        keywords_prompt = (
+            "Extract exactly 5 keywords from this text. "
+            "Return only the keywords, separated by commas, all in lowercase, no numbering, no extra text:\n"
+            f"{chunk}"
+        )       
+        keywords=ask_ollama(keywords_prompt).strip()
+
+         # Generate summary
+        summary_prompt = f"Summarize this text in 1 sentence. Return only the summary sentence:{chunk}"
+        summary = ask_ollama(summary_prompt)
+
         doc_data=DocumentData(
             document_name=document_name,
             chunk_number=idx+1,
             chunk_content=chunk,
-            role=role
+            role=role,
+            keywords=keywords,
+            summary=summary
         )
-    db.add(doc_data)
+        db.add(doc_data)
     db.commit()
    
