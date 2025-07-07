@@ -14,6 +14,8 @@ class DocumentData(Base):
     chunk_number = Column(Integer, nullable=False)
     chunk_content = Column(Text, nullable=False)
     role = Column(Text, nullable=False)
+    keywords = Column(Text)
+    summary = Column(Text)
 
 
 class UserRoleMap(Base):

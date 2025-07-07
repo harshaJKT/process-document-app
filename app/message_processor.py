@@ -1,86 +1,108 @@
 import uuid
 import PyPDF2
 import os
-import asyncio
-import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import DocumentData
-
-
-async def process_document(message):
-    """
-    Process uploaded document: read, chunk, store
-    """
-    file_path = message["file_path"]
-    original_name = message["original_name"]
-    role = message.get("role_required", "Analyst")
-
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
-
-    try:
-        content = await read_file_content(file_path)
-        chunks = await chunk_content(content)
-        await store_chunks_in_db(chunks, original_name, role)
-        print(f"[Worker] Completed processing: {original_name}")
-    except Exception as e:
-        print(f"[Worker] Error processing {original_name}: {str(e)}")
-
-async def read_file_content(file_path):
-    ext = os.path.splitext(file_path)[1].lower()
-
-    if ext == ".pdf":
-        content = ""
-        with open(file_path, "rb") as f:
-            reader = PyPDF2.PdfReader(f)
-            for page in reader.pages:
-                content += page.extract_text() or ""
-        return content.strip()
-
-    elif ext == ".txt":
-        async with aiofiles.open(file_path, mode='r') as f:
-            content = await f.read()
-        return content.strip()
-
-    else:
-        raise ValueError("Unsupported file format. Only .pdf and .txt are allowed.")
-
-async def chunk_content(content):
-
-    content = content.replace("\n", " ").strip()
-    chunks = []
-    chunk_size = 500
-    min_size = 100
-
-    index = 0
-    while index < len(content):
-        chunk = content[index:index + chunk_size].strip()
-        if len(chunk) >= min_size:
-            chunks.append(chunk)
-        index += chunk_size
-
-    if len(chunks) < 4:
-        chunks += ["..."] * (4 - len(chunks))
-
-    return chunks
-
+from app.ollama_utils import generate_keywords, summarize_text
 
 async def store_chunks_in_db(chunks, document_name, role):
-    db: Session = SessionLocal()
+    from app.database import SessionLocal
+    from app.models import DocumentData
+    db = SessionLocal()
     try:
         for idx, chunk in enumerate(chunks):
-            record = DocumentData(
-                chunk_id=uuid.uuid4(),
+            print(f"[DEBUG] Processing chunk {idx+1}: {chunk[:50]}...")
+            keywords = generate_keywords(chunk)
+            print(f"[OLLAMA] Keywords: {keywords}")
+            summary = summarize_text(chunk)
+            print(f"[OLLAMA] Summary: {summary}")
+            doc_chunk = DocumentData(
                 document_name=document_name,
                 chunk_number=idx + 1,
                 chunk_content=chunk,
                 role=role,
+                keywords=keywords,
+                summary=summary
             )
-            db.add(record)
+            db.add(doc_chunk)
         db.commit()
-        print(f"[DB] Stored {len(chunks)} chunks for {document_name}")
-    except Exception as e:
-        db.rollback()
-        print(f"[DB] Error saving to DB: {str(e)}")
     finally:
         db.close()
+
+        
+async def process_document(message):
+    """
+    TODO: Implement document processing logic
+    - Extract file_path and original_name from message
+    - Read file content (PDF/text)
+    - Chunk content into paragraphs/pages (min 4 chunks)
+    - Store each chunk in document_data table with chunk_number
+    """
+
+    # ✅ These keys should be present in the message while publishing the message to the topic.
+    file_path = message["file_path"]
+    original_name = message["original_name"]
+    role = message["role_required"]
+
+    print(f"[Worker] Processing file: {original_name} at {file_path}")
+
+    # TODO: Read file content
+    content = await read_file_content(file_path)
+
+    # TODO: Chunk content
+    chunks = await chunk_content(content)
+
+    # TODO: Store chunks in database
+    await store_chunks_in_db(chunks, original_name, role)
+
+    print(f"[Worker] Completed processing: {original_name}")
+
+
+async def read_file_content(file_path):
+    """
+    TODO: Implement file reading logic
+    - Support PDF files using PyPDF2
+    - Return file content as string
+    """
+    try:
+        content = ""
+        with open(file_path, "rb") as file:
+            reader = PyPDF2.PdfReader(file)
+            for page in reader.pages:
+                content += page.extract_text() or ""
+        return content.strip()
+    except Exception as e:
+        print(f"[Error] Failed to read file: {e}")
+        return ""
+
+
+async def chunk_content(content):
+    """
+    TODO: Implement content chunking logic
+    - Split content into paragraphs or pages
+    - Ensure size of each chunk is < 100 characters and > 10 characters
+    - Return list of chunks
+    """
+    words = content.split()
+    chunks = []
+    chunk = ""
+
+    for word in words:
+        if len(chunk) + len(word) + 1 <= 100:
+            chunk += " " + word if chunk else word
+        else:
+            if 10 <= len(chunk) <= 100:
+                chunks.append(chunk.strip())
+            chunk = word
+
+    if 10 <= len(chunk) <= 100:
+        chunks.append(chunk.strip())
+
+    # Ensure at least 4 chunks
+    while len(chunks) < 4:
+        chunks.append("padding content to meet min chunk requirement.")
+
+    return chunks
+
+ 
