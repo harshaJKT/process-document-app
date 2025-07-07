@@ -8,6 +8,11 @@ venv/
 .env/
 .env.*
 
+# Ignore everything inside uploads/
+uploads/*
+# But keep this placeholder file (see step 2)
+!uploads/.gitkeep
+
 # Distribution / packaging
 build/
 dist/
