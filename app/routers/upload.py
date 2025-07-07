@@ -47,9 +47,11 @@ async def upload_document(
         message =  {
             "message": "File uploaded and queued for processing",
             "file_path": destination_file_path,  # TODO: file_path
-            "role_required": role,
+            "role_required": role.lower(),
             "original_name":file.filename
         }
+
+        print(message)
 
         await broker.publish("doc_uploaded",message )
         return message
