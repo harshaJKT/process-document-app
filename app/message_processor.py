@@ -61,7 +61,6 @@ async def read_file_content(file_path):
     """
     try:
         text = ""
-        print(file_path)
         with open(file_path,'rb') as file:
             reader = PyPDF2.PdfReader(file)
             for page in reader.pages:

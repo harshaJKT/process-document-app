@@ -51,8 +51,6 @@ async def upload_document(
             "original_name":file.filename
         }
 
-        print(message)
-
         await broker.publish("doc_uploaded",message )
         return message
 

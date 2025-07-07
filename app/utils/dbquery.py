@@ -8,7 +8,6 @@ def query_db_postgres(dburl:str ,query:str):
         cursor.execute(query)
 
         rows = cursor.fetchall()
-        print(rows)
         return rows
     except Exception as e:
         print("Error querying db")

@@ -30,7 +30,9 @@ def get_chunk_ids(required_keywords:list , db:Session,role:str ,required_match:i
 def get_answer(question:str,role:str)->str:
     db:Session=SessionLocal()
     required_keywords = chat.get_keywords_from_ollama(question)
+    required_keywords = [keyword.lower() for keyword in required_keywords]
     chunk_ids = get_chunk_ids(required_keywords , db,role = role,required_match=1)
+    print(required_keywords,question)
     if len(chunk_ids)==0:
         return "Nothng found from our side"
     para = get_para(chunk_ids,db)

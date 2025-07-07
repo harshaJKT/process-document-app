@@ -24,7 +24,7 @@ def get_summary_from_ollama(paragraph:str,model='llama3.2:1b')->str:
 
 def get_keywords_from_ollama(paragraph:str,model='llama3.2:1b')->str:
     prompt = """
-        Extract the important keywords from the following paragraph. Do not leave out anything important.
+        Extract the keywords from the following paragraph. Do not leave out anything important.
 
         Return only a JSON array of strings.
         Do not include any explanation, code block, or extra text.
