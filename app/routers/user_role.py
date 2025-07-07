@@ -7,30 +7,9 @@ import uuid
 from pydantic import BaseModel
 from fastapi import HTTPException
 import config
+from app.utils import dbquery
 
 router = APIRouter()
-
-def query_db_postgres(dburl:str , table , columns:list):
-    try:
-        conn = psycopg2.connect(dburl)
-        cursor = conn.cursor()
-
-        cols_str = ', '.join(columns)
-        query = f"select {cols_str} from {table};"
-
-        cursor.execute(query)
-
-        rows = cursor.fetchall()
-        print(rows)
-        return rows
-    except Exception as e:
-        print("Error querying db for user roles ")
-        return []
-    finally:
-        cursor.close()
-        conn.close()
-
-
 
 class UserRoleCreate(BaseModel):
     user: str
@@ -54,7 +33,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
     """
     try:
         # TODO: Create new UserRoleMap instance
-        new_user_role = UserRoleMap(user=user_role.user, role=user_role.role)
+        new_user_role = UserRoleMap(user=user_role.user, role=user_role.role.lower())
 
         # TODO: Add to database and commit
         db.add(new_user_role)
@@ -72,7 +51,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/user-role", response_model=list[UserRoleResponse])
-def get_all_user_roles(db: Session = Depends(get_db)):
+def get_all_user_roles():
     """
     TODO: Implement GET /user-role
     - Query all user-role mappings from database
@@ -83,7 +62,9 @@ def get_all_user_roles(db: Session = Depends(get_db)):
         dburl = config.DATABASE_URL
         table = "user_role_map"
         cols = ['id' , '"user"' , 'role']
-        user_roles = query_db_postgres(dburl , table , cols)
+        cols_str = ', '.join(cols)
+        query = f"select {cols_str} from {table};"
+        user_roles = dbquery.query_db_postgres(dburl , query)
 
         # TODO: Convert to response format
         #normalizing the col name as user is a keyword in postgres

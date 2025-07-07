@@ -12,8 +12,15 @@ import ollama
 from app.utils import chat
 
 
-def divide_into_chunks(content,chunk_size)->list:
-    return [content[i:i+chunk_size] for i in range(0,len(content),chunk_size)]
+def divide_into_chunks(content, chunk_size) -> list:
+    chunks = []
+    for i in range(0, len(content), chunk_size):
+        start = max(0, i - 20)  # go 10 chars back, but not before 0
+        end = i + chunk_size
+        chunk = content[start:end]
+        chunks.append(chunk)
+    return chunks
+
 
 
 async def process_document(message):
@@ -26,7 +33,6 @@ async def process_document(message):
     """
 
     # These keys should be present in the message while publishing the message to the topic.
-    print(message)
     file_path = message["file_path"]
     original_name = message["original_name"]
     role = message.get("role_required", "Analyst")
@@ -35,6 +41,7 @@ async def process_document(message):
 
     # TODO: Read file content
     content = await read_file_content(file_path)
+    content = content.lower()
 
     # TODO: Chunk content
     chunks = await chunk_content(content)
@@ -73,7 +80,7 @@ async def chunk_content(content):
     - Return list of chunks
     """
     # TODO: Implement content chunking logic
-    chunk_size = 50
+    chunk_size = 70
     chunks = divide_into_chunks(content,chunk_size)
     return chunks
 
@@ -91,6 +98,7 @@ async def store_chunks_in_db(chunks, document_name, role):
         chunk_number = 1
         for chunk in chunks:
             keywords = chat.get_keywords_from_ollama(chunk)
+            keywords = [keyword.lower() for keyword in keywords]
             summary = chat.get_summary_from_ollama(chunk)
             record = DocumentData(document_name = document_name , chunk_number = chunk_number , chunk_content = chunk , role = role,keywords = keywords,summary = summary)
             chunk_number+=1
