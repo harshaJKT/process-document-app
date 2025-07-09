@@ -4,7 +4,7 @@ from app.message_processor import process_document
 
 async def start_subscriber():
     """
-    Start the background subscriber to process uploaded documents
+    Start the subscriber to process uploaded documents
     """
     broker.subscribe("doc_uploaded", process_document)
     print("[Subscriber] Started listening for document uploads")
