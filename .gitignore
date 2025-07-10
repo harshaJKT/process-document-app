@@ -1,0 +1,13 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+uploads/
+# Virtual environment
+venv/
+
+# Environment variables
+.env
+
+# Editor/IDE settings (optional)
+.vscode/

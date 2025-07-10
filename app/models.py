@@ -13,6 +13,8 @@ class DocumentData(Base):
     document_name = Column(Text, nullable=False)
     chunk_number = Column(Integer, nullable=False)
     chunk_content = Column(Text, nullable=False)
+    keywords = Column(Text, nullable=True)
+    summary = Column(Text, nullable=False)
     role = Column(Text, nullable=False)
 
 
