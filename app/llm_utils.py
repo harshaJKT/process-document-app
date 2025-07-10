@@ -17,8 +17,8 @@ Return 3‑6 concise keywords for the text below as a **single comma‑separated
 {chunk}
 """
 
-def _sync_summary(chunk: str) -> str:
-    """Blocking call; returns summary string."""
+def _sync_summary(chunk: str):
+    """returns summary string."""
     res = ollama.chat(
         model="llama3.2:1b",
         messages=[{"role": "user", "content": SUMMARY_PROMPT.format(chunk=chunk)}],
@@ -26,7 +26,7 @@ def _sync_summary(chunk: str) -> str:
     )
     return res["message"]["content"].strip()
 
-def _sync_keywords(chunk: str) -> str:
+def _sync_keywords(chunk: str):
     res = ollama.chat(
         model="llama3.2:1b",
         messages=[{"role": "user", "content": KEYWORDS_PROMPT.format(chunk=chunk)}],
@@ -34,21 +34,14 @@ def _sync_keywords(chunk: str) -> str:
     )
     return res["message"]["content"].strip()
 
-async def generate_summary(chunk: str) -> str:
-    """Return summary without blocking the event loop."""
+async def generate_summary(chunk: str):
     return await asyncio.to_thread(_sync_summary, chunk)
 
-async def generate_keywords(chunk: str) -> str:
-    """Return keywords without blocking the event loop."""
+async def generate_keywords(chunk: str):
     return await asyncio.to_thread(_sync_keywords, chunk)
 
 
-async def extract_summary_keywords(chunk: str) -> Tuple[str, List[str]]:
-    """
-    Run summary & keyword extraction concurrently and
-    return (summary, keywords).
-    """
-    # Fire both tasks simultaneously
+async def extract_summary_keywords(chunk: str):
     summary_task   = asyncio.create_task(generate_summary(chunk))
     keywords_task  = asyncio.create_task(generate_keywords(chunk))
 

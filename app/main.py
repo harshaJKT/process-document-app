@@ -7,7 +7,7 @@ app = FastAPI()
 # Include routers
 app.include_router(upload.router, tags=["File Upload"])
 app.include_router(user_role.router, tags=["User Role Management"])
-app.include_router(retrieve.router)
+app.include_router(retrieve.router, tags=["retrieve"])
 
 
 @app.on_event("startup")

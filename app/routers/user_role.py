@@ -65,3 +65,56 @@ def get_all_user_roles(db: Session = Depends(get_db)):
  
  
 # TODO: Implement U and D of CRUD (Create, Read implemented above, Update and Delete to be implemented)
+
+
+@router.put("/user-role/{id}", response_model=UserRoleResponse)
+def update_user_role(
+    id: str,
+    updated_role: UserRoleCreate,
+    db: Session = Depends(get_db)
+):
+    """
+    Implement PUT /user-role/{id}
+    - Find the mapping by ID
+    - Update user and role fields
+    - Save changes to database
+    - Return updated mapping
+    """
+    try:
+        # Fetch the existing user-role mapping
+        user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+
+        if not user_role:
+            raise HTTPException(status_code=404, detail="User-Role mapping not found")
+
+        user_role.user = updated_role.user
+        user_role.role = updated_role.role
+
+        db.commit()
+        db.refresh(user_role)
+
+        return UserRoleResponse(id=str(user_role.id), user=user_role.user, role=user_role.role)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/user-role/{id}", status_code=204)
+def delete_user_role(id: str, db: Session = Depends(get_db)):
+    """
+    Implement DELETE /user-role/{id}
+    - Find mapping by ID
+    - Delete from database
+    - Return 204 No Content
+    """
+    try:
+        user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+
+        if not user_role:
+            raise HTTPException(status_code=404, detail="User-Role mapping not found")
+
+        db.delete(user_role)
+        db.commit()
+
+        return
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

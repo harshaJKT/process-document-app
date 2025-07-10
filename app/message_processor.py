@@ -1,8 +1,5 @@
-import uuid
 import PyPDF2
-import os
 import asyncio
-import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.llm_utils import extract_summary_keywords
@@ -20,7 +17,6 @@ async def process_document(message):
     - Store each chunk in document_data table with chunk_number
     """
  
-    # These keys should be present in the message while publishing the message to the topic.
     file_path = message["file_path"]
     original_name = message["original_name"]
     role = message["role"]
@@ -72,12 +68,9 @@ async def chunk_content(content):
     chunks = []
 
     for para in paragraphs:
-        # While paragraph is longer than CHUNK_MAX, carve off pieces
         while len(para) > CHUNK_MAX:
-            # Try to break at the last space before 100 chars
             split_at = para.rfind(" ", 0, CHUNK_MAX)
             if split_at == -1 or split_at < CHUNK_MIN:
-                # No good space → hard split at CHUNK_MAX
                 split_at = CHUNK_MAX
             part = para[:split_at].strip()
             if len(part) > CHUNK_MIN:
@@ -86,7 +79,7 @@ async def chunk_content(content):
         
         if CHUNK_MIN < len(para) <= CHUNK_MAX:
             chunks.append(para)
-    return chunks  # TODO: Implement content chunking logic
+    return chunks
  
  
 async def store_chunks_in_db(chunks, document_name, role):
