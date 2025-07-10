@@ -1,6 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Form
 import os
-import uuid
 import aiofiles
 
 from app.messaging import broker
@@ -27,15 +26,11 @@ async def upload_document(
     """
     try:
         os.makedirs(config.UPLOAD_DIR, exist_ok=True)
-
-        # Generate unique filename to avoid collisions
         file_path = os.path.join(config.UPLOAD_DIR, file.filename)
-
-        # Save the file asynchronously
+        
         async with aiofiles.open(file_path, 'wb') as f:
             await f.write(await file.read())
 
-        # Prepare message for processing
         message = {
             "file_path": file_path,
             "original_name": file.filename,

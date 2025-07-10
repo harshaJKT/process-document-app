@@ -20,6 +20,7 @@ class MessageBroker:
 
         asyncio.create_task(listen())
 
+        
 
 broker = MessageBroker()
 broker.create_topic("doc_uploaded")

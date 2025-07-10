@@ -28,7 +28,6 @@ class DocumentData(Base):
     keywords: str = Column(Text, nullable=True)
     summary: str = Column(Text, nullable=True)
 
-
 class UserRoleMap(Base):
     """
     Maps a user to a role for access control.

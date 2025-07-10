@@ -31,7 +31,7 @@ async def process_document(message: dict):
         original_name = message["original_name"]
         role = message.get("role_required", "Analyst")
     except KeyError as e:
-        logger.error(f"Missing expected key in message: {e}")
+        logger.error(f"Missing key in message: {e}")
         return
 
     logger.info(f"Started processing: {original_name}")
@@ -66,12 +66,10 @@ async def check_document_exists(document_name: str, role: str) -> bool:
             select(DocumentData)
             .where(DocumentData.document_name == document_name)
             .where(DocumentData.role == role)
-            .limit(1)
         ).first()
         return result is not None
     except Exception as e:
         logger.error(f"Error checking document existence: {e}")
-        raise
     finally:
         db.close()
 
@@ -84,19 +82,14 @@ async def read_file_content(file_path: str) -> str:
     try:
         async with aiofiles.open(file_path, 'rb') as f:
             data = await f.read()
-    except FileNotFoundError:
-        logger.error(f"File not found: {file_path}")
-        raise
     except Exception as e:
-        logger.error(f"Error reading file: {e}")
-        raise
+        logger.error(f"Error reading file.")
 
     try:
         reader = PyPDF2.PdfReader(BytesIO(data))
         return "\n".join(page.extract_text() or "" for page in reader.pages)
     except Exception as e:
         logger.error(f"Error parsing PDF content: {e}")
-        raise
 
 
 async def chunk_content(content: str) -> list[str]:
@@ -109,29 +102,20 @@ async def chunk_content(content: str) -> list[str]:
     MIN_CHARS = 10
     MAX_CHARS = 100
 
-    sentences = content.replace('\n', ' ').split('.')  # split by sentence
+    sentences = content.replace('\n', ' ').split('.') 
+
     chunks = []
-    current_chunk = ""
 
-    for sentence in sentences:
-        sentence = sentence.strip()
-        if not sentence:
-            continue
+    temp = sentences[0]
+    for _,index in enumerate(sentences,1):
 
-        # Add period back to sentence
-        sentence += '.'
-
-        # If adding this sentence keeps us under limit
-        if len(current_chunk) + len(sentence) <= MAX_CHARS:
-            current_chunk += ' ' + sentence if current_chunk else sentence
+        if len(temp) + len(sentences[index]) < MAX_CHARS:
+            temp += sentences[index] + "."
         else:
-            if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
-                chunks.append(current_chunk.strip())
-            current_chunk = sentence
+            chunks.append(temp)
+            temp = sentences[index] + "."
 
-    # Final leftover chunk
-    if MIN_CHARS <= len(current_chunk) <= MAX_CHARS:
-        chunks.append(current_chunk.strip())
+    chunks.append(temp)
 
     return chunks
 
@@ -160,9 +144,9 @@ async def enrich_chunks_with_llm(chunks: list[str]) -> list[dict]:
                 "keywords": ",".join(llm_response.get("keywords", [])),
                 "summary": llm_response.get("summary", "")
             })
-            logger.info(f"LLM enrichment done for chunk #{i}")
+            logger.info(f"LLM enrichment done for chunk number {i}")
         except Exception as e:
-            logger.error(f"LLM enrichment failed for chunk #{i}: {e}")
+            logger.error(f"LLM enrichment failed.")
             enriched.append({
                 "content": chunk,
                 "keywords": "",
@@ -195,13 +179,8 @@ async def store_chunks_in_db(enriched_chunks: list[dict], document_name: str, ro
 
         db.add_all(db_chunks)
         db.commit()
-    except SQLAlchemyError as db_err:
-        db.rollback()
-        logger.exception(f"Database error while storing chunks: {db_err}")
-        raise
     except Exception as e:
         db.rollback()
-        logger.exception(f"Unexpected error during DB insert: {e}")
-        raise
+        logger.exception(f"Server error.")
     finally:
         db.close()

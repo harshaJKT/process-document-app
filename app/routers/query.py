@@ -16,8 +16,6 @@ class QueryRequest(BaseModel):
     query: str
     user: str
 
-# --- Sub-Functions ---
-
 def get_user_role(db: Session, username: str) -> str:
     """
     Fetch the role associated with a given username.
@@ -75,21 +73,12 @@ async def handle_query(request: QueryRequest, db: Session = Depends(get_db)):
     """
     
     role = get_user_role(db, request.user)
-    if not role:
-        logger.warning(f"Role not found for user: {request.user}")
-        raise HTTPException(status_code=403, detail="User role not found")
     logger.info(f"Retrieved role '{role}' for user '{request.user}'")
 
     keywords = await extract_keywords(request.query)
-    if not keywords:
-        logger.error("Keyword extraction failed")
-        raise HTTPException(status_code=500, detail="Keyword extraction failed")
     logger.info(f"Extracted keywords: {keywords}")
 
     filtered_chunks = filter_chunks_by_keywords(db, role, keywords)
-    if not filtered_chunks:
-        logger.warning(f"No matching chunks found for keywords: {keywords}")
-        raise HTTPException(status_code=404, detail="No matching chunks found for keywords")
     logger.info(f"Filtered down to {len(filtered_chunks)} relevant chunks")
 
     final_context = "\n".join(filtered_chunks)
