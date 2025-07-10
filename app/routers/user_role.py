@@ -4,19 +4,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 import uuid
-
 from app.database import get_db
 from app.models import UserRoleMap
 from app.logger import setup_logger
 
-router = APIRouter()
 logger = setup_logger(__name__)
 
+router = APIRouter()
 
 class UserRoleCreate(BaseModel):
     user: str
     role: str
-
 
 class UserRoleResponse(BaseModel):
     id: str
@@ -40,7 +38,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_user_role)
 
-        logger.info(f"Created user-role: {new_user_role.username} -> {new_user_role.role}")
+        logger.info(f"Created user-role: {new_user_role.username} => {new_user_role.role}")
 
         return JSONResponse(
             content=UserRoleResponse(
@@ -51,25 +49,21 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
             status_code=201
         )
 
-    except SQLAlchemyError as e:
-        db.rollback()
-        logger.exception("Database error while creating user-role")
-        return JSONResponse(content={"error": "Database error"}, status_code=500)
     except Exception as e:
-        logger.exception("Unexpected error while creating user-role")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        db.rollback()
+        logger.exception("Server error.")
+        return JSONResponse(content={"error": "Server error"}, status_code=500)
 
 
 @router.get("/user-role", response_model=list[UserRoleResponse])
-def get_all_user_roles(db: Session = Depends(get_db)):
+def get_all_user_roles(db: Session =  Depends(get_db)):
     """
     Retrieve all user-role mappings from the database.
     """
     try:
         db_users = db.query(UserRoleMap).all()
         logger.info(f"Fetched {len(db_users)} user-role records.")
-
-        return [
+        response_array = [
             UserRoleResponse(
                 id=str(user.id),
                 user=user.username,
@@ -77,10 +71,8 @@ def get_all_user_roles(db: Session = Depends(get_db)):
             )
             for user in db_users
         ]
+        return response_array
 
-    except SQLAlchemyError:
-        logger.exception("Database error while fetching user-roles")
-        return JSONResponse(content={"error": "Database error"}, status_code=500)
     except Exception as e:
-        logger.exception("Unexpected error while fetching user-roles")
-        return JSONResponse(content={"error": str(e)}, status_code=500)
+        logger.exception("Server error .")
+        return JSONResponse(content={"error": "Server error"}, status_code=500)
