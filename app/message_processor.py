@@ -1,62 +1,100 @@
 import uuid
 import PyPDF2
-import os
-import asyncio
-import aiofiles
 from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import DocumentData
+from app.together_client import generate_keywords_and_summary
 
-
-async def process_document(message):
+def divide_into_chunks(text: str, chunk_size: int = 50) -> list[str]:
     """
-    TODO: Implement document processing logic
-    - Extract file_path and original_name from message
-    - Read file content (PDF/text)
-    - Chunk content into paragraphs/pages (min 4 chunks)
-    - Store each chunk in document_data table with chunk_number
+    Split the text into smaller parts (chunks) of a given size.
     """
+    chunks = []
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i:i + chunk_size]
+        if 10 < len(chunk) <= chunk_size:
+            chunks.append(chunk)
+    return chunks
 
-    # These keys should be present in the message while publishing the message to the topic.
+async def process_document(message: dict):
+    """
+    Function to process the document:
+    1. Read the PDF file.
+    2. Split the content into smaller parts.
+    3. Generate keywords and summary for each part.
+    4. Store everything in the database.
+    """
     file_path = message["file_path"]
-    original_name = message["original_name"]
-    role = message.get("role_required", "Analyst")
+    document_name = message["original_filename"]
+    role = message.get("role", "Default")  # Default role is 'Default'
 
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
+    print(f"Processing document: {document_name}")
 
-    # TODO: Read file content
+    print(f"Reading PDF")
+    content = await read_pdf(file_path)
+    print(f"PDF content read successfully ({len(content)} characters)")
 
-    # TODO: Chunk content
+    print(f"Splitting content into chunks")
+    chunks = await split_content(content)
+    print(f"Content split into {len(chunks)} chunks")
+    
+    print(f"Saving chunks to database")
+    await save_chunks_to_database(chunks, document_name, role)
+    print(f"Chunks saved to database successfully")
 
-    # TODO: Store chunks in database
-    # store_chunks_in_db(chunks, document_name, role)
+async def read_pdf(file_path: str) -> str:
+   
+    text = ""
+    with open(file_path, "rb") as file:
+        reader = PyPDF2.PdfReader(file)
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+    return text.strip()
 
-    print(f"[Worker] Completed processing: {original_name}")
-
-
-async def read_file_content(file_path):
+async def split_content(text: str) -> list[str]:
     """
-    TODO: Implement file reading logic
-    - Support PDF files using PyPDF2
-    - Return file content as string
+    Split the text into chunks.
+    Ensure at least 4 chunks by adjusting the size if needed.
     """
+    chunks = divide_into_chunks(text)
 
+    # If less than 4 chunks, forcefully split into 4 parts
+    if len(chunks) < 4:
+        part_size = max(10, len(text) // 4)
+        chunks = [
+            text[i:i + part_size]
+            for i in range(0, len(text), part_size)
+        ]
 
-async def chunk_content(content):
-    """
-    TODO: Implement content chunking logic
-    - Split content into paragraphs or pages
-    - Ensure size of each chunk is < 100 characters and > 10 characters
-    - Return list of chunks
-    """
-    pass  # TODO: Implement content chunking logic
+    return chunks
 
+async def save_chunks_to_database(chunks: list[str], document_name: str, role: str):
+    """
+    Save each chunk along with its keywords and summary into the database.
+    """
+    db: Session = SessionLocal()
+    try:
+        for idx, chunk in enumerate(chunks):
+            # Generate keywords and summary for this chunk
+            keywords, summary = await generate_keywords_and_summary(chunk)
 
-async def store_chunks_in_db(chunks, document_name, role):
-    """
-    TODO: Implement database storage logic
-    - Create database session
-    - For each chunk, create DocumentData record with chunk_number
-    - Commit to database
-    """
-    pass  # TODO: Implement database storage logic
+            # Create a new database record
+            record = DocumentData(
+                chunk_id=str(uuid.uuid4()),
+                document_name=document_name,
+                chunk_number=idx + 1,
+                chunk_content=chunk,
+                role=role,
+                keywords=keywords,
+                summary=summary
+            )
+            db.add(record)  
+
+        db.commit() 
+    except Exception as e:
+        db.rollback()  
+        raise RuntimeError(f"Failed to save to database: {e}")
+    finally:
+        db.close()  

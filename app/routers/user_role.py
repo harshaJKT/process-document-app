@@ -1,65 +1,63 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import UserRoleMap
-import uuid
 from pydantic import BaseModel
+from typing import List
+from uuid import UUID, uuid4
 
 router = APIRouter()
 
 
+# Request body for creating or updating user roles
 class UserRoleCreate(BaseModel):
     user: str
     role: str
 
-
+# Response model for returning user role data
 class UserRoleResponse(BaseModel):
-    id: str
+    id: UUID
     user: str
     role: str
 
 
-@router.post("/user-role", response_model=UserRoleResponse, status_code=201)
+@router.post("/user-role", response_model=UserRoleResponse, status_code=status.HTTP_201_CREATED)
 def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
-    """
-    TODO: Implement POST /user-role
-    - Create new user-role mapping
-    - Generate UUID for id
-    - Save to user_role_map table
-    - Return created mapping
-    """
-    try:
-        # TODO: Create new UserRoleMap instance
-        new_user_role = UserRoleMap(user=user_role.user, role=user_role.role)
-
-        # TODO: Add to database and commit
-        db.add(new_user_role)
-        db.commit()
-        db.refresh(new_user_role)
-
-        return UserRoleResponse(
-            user=user_role.user,
-            role=user_role.role,
-        )
-    except Exception as e:
-        return {"error": str(e)}
+    """Create a new user role."""
+    new_user_role = UserRoleMap(id=uuid4(), user=user_role.user, role=user_role.role)
+    db.add(new_user_role)
+    db.commit()
+    db.refresh(new_user_role)
+    return new_user_role
 
 
-@router.get("/user-role", response_model=list[UserRoleResponse])
+@router.get("/user-role", response_model=List[UserRoleResponse])
 def get_all_user_roles(db: Session = Depends(get_db)):
-    """
-    TODO: Implement GET /user-role
-    - Query all user-role mappings from database
-    - Return list of all mappings
-    """
-    try:
-        # TODO: Query all UserRoleMap records
-
-        # TODO: Convert to response format
-
-        return []  # Placeholder
-    except Exception as e:
-        return {"error": str(e)}
+    """Get all user roles."""
+    return db.query(UserRoleMap).all()
 
 
-# TODO: Implement U and D of CRUD (Create, Read implemented above, Update and Delete to be implemented)
+@router.put("/user-role/{id}", response_model=UserRoleResponse)
+def update_user_role(id: UUID, updated_data: UserRoleCreate, db: Session = Depends(get_db)):
+    """Update a specific user role by ID."""
+    user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+    if not user_role:
+        raise HTTPException(status_code=404, detail="User role not found")
+
+    user_role.user = updated_data.user
+    user_role.role = updated_data.role
+    db.commit()
+    db.refresh(user_role)
+    return user_role
+
+
+@router.delete("/user-role/{id}", status_code=status.HTTP_200_OK)
+def delete_user_role(id: UUID, db: Session = Depends(get_db)):
+    """Delete a specific user role by ID."""
+    user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
+    if not user_role:
+        raise HTTPException(status_code=404, detail="User role not found")
+
+    db.delete(user_role)
+    db.commit()
+    return {"message": f"User role {id} deleted successfully"}
