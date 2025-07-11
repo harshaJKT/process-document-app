@@ -38,7 +38,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
         # TODO: Add to database and commit
         db.add(new_user_role)
         db.commit()
-        db.refresh(new_user_role)
+        db.refresh(new_user_role)# to get any new field that the db has generated , in this case the id
 
         return UserRoleResponse(
             id=str(new_user_role.id),
@@ -51,7 +51,7 @@ def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/user-role", response_model=list[UserRoleResponse])
-def get_all_user_roles():
+def get_all_user_roles(db:Session = Depends(get_db)):
     """
     TODO: Implement GET /user-role
     - Query all user-role mappings from database
@@ -59,12 +59,14 @@ def get_all_user_roles():
     """
     try:
         # TODO: Query all UserRoleMap records
-        dburl = config.DATABASE_URL
         table = "user_role_map"
+
         cols = ['id' , '"user"' , 'role']
         cols_str = ', '.join(cols)
+
         query = f"select {cols_str} from {table};"
-        user_roles = dbquery.query_db_postgres(dburl , query)
+
+        user_roles = dbquery.query_db_postgres(db, query)
 
         # TODO: Convert to response format
         #normalizing the col name as user is a keyword in postgres

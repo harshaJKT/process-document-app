@@ -1,17 +1,13 @@
-import psycopg2
+from sqlalchemy.orm import Session
 
-def query_db_postgres(dburl:str ,query:str):
+
+def query_db_postgres(db:Session ,query:str,params:dict=None):
     try:
-        conn = psycopg2.connect(dburl)
-        cursor = conn.cursor()
 
-        cursor.execute(query)
+        result = db.execute(query,params or {})
+        rows = result.fetchall()
 
-        rows = cursor.fetchall()
         return rows
     except Exception as e:
-        print("Error querying db")
+        print("Error executing the query")
         return []
-    finally:
-        cursor.close()
-        conn.close()

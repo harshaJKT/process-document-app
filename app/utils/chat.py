@@ -23,25 +23,28 @@ def get_summary_from_ollama(paragraph:str,model='llama3.2:1b')->str:
     return response["message"]["content"]
 
 def get_keywords_from_ollama(paragraph:str,model='llama3.2:1b')->str:
-    prompt = """
-        Extract the keywords from the following paragraph. Do not leave out anything important.
+    try:
+        prompt = """
+            Extract the keywords from the following paragraph. Do not leave out anything important.
 
-        Return only a JSON array of strings.
-        Do not include any explanation, code block, or extra text.
-        Example: ["keyword1", "keyword2", "another keyword"]
+            Return only a JSON array of strings.
+            Do not include any explanation, code block, or extra text.
+            Example: ["keyword1", "keyword2", "another keyword"]
 
-        Text:
-        "{question}"
-        """
-    question = get_question(prompt,question = paragraph)
-    response = ollama.chat(
-        model = model,
-        messages=[
-            {'role':'user' , 'content':question}
-        ]
-    )
+            Text:
+            "{question}"
+            """
+        question = get_question(prompt,question = paragraph)
+        response = ollama.chat(
+            model = model,
+            messages=[
+                {'role':'user' , 'content':question}
+            ]
+        )
 
-    return ast.literal_eval(response["message"]["content"])
+        return ast.literal_eval(response["message"]["content"])#the returned 
+    except Exception as e:
+        raise e
 
 def get_answer_from_para(paragraph:str,question:str,model = 'llama3.2:1b')->str:
 
@@ -57,7 +60,7 @@ def get_answer_from_para(paragraph:str,question:str,model = 'llama3.2:1b')->str:
         Answer:"""
 
     response = ollama.chat(
-        model = 'llama3.2:1b',
+        model = model,
         messages=[
             {
                 'role':'user',

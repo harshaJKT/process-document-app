@@ -12,10 +12,12 @@ import ollama
 from app.utils import chat
 
 
-def divide_into_chunks(content, chunk_size) -> list:
+#dividing based on given chunk size and overlap
+def divide_into_chunks(content, chunk_size, overlap) -> list:
     chunks = []
-    for i in range(0, len(content), chunk_size):
-        start = max(0, i - 20)  # go 10 chars back, but not before 0
+    content_length = len(content)
+    for i in range(0, content_length, chunk_size):
+        start = max(0, i - overlap)
         end = i + chunk_size
         chunk = content[start:end]
         chunks.append(chunk)
@@ -33,24 +35,28 @@ async def process_document(message):
     """
 
     # These keys should be present in the message while publishing the message to the topic.
-    file_path = message["file_path"]
-    original_name = message["original_name"]
-    role = message.get("role_required", "Analyst")
+    try:
+        file_path = message["file_path"]
+        original_name = message["original_name"]
+        role = message.get("role_required", "Analyst")
 
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
+        print(f"[Worker] Processing file: {original_name} at {file_path}")
 
-    # TODO: Read file content
-    content = await read_file_content(file_path)
-    content = content.lower()
+        # TODO: Read file content
+        content = await read_file_content(file_path)
 
-    # TODO: Chunk content
-    chunks = await chunk_content(content)
+        # TODO: Chunk content
+        print("Chunking the contents")
+        chunks = await chunk_content(content)
 
-    # TODO: Store chunks in database
-    # store_chunks_in_db(chunks, document_name, role)
-    await store_chunks_in_db(chunks , original_name , role)
+        # TODO: Store chunks in database
+        # store_chunks_in_db(chunks, document_name, role)
+        print("Storing in db")
+        await store_chunks_in_db(chunks , original_name , role)
 
-    print(f"[Worker] Completed processing: {original_name}")
+        print(f"[Worker] Completed processing: {original_name}")
+    except Exception as e:
+        raise e
 
 
 async def read_file_content(file_path):
@@ -80,10 +86,11 @@ async def chunk_content(content):
     """
     # TODO: Implement content chunking logic
     chunk_size = 70
-    chunks = divide_into_chunks(content,chunk_size)
+    overlap = 7
+    chunks = divide_into_chunks(content,chunk_size,overlap)
     return chunks
 
-
+#this function stores chunks in db 
 async def store_chunks_in_db(chunks, document_name, role):
     """
     TODO: Implement database storage logic
@@ -96,9 +103,11 @@ async def store_chunks_in_db(chunks, document_name, role):
     try:
         chunk_number = 1
         for chunk in chunks:
-            keywords = chat.get_keywords_from_ollama(chunk)
-            keywords = [keyword.lower() for keyword in keywords]
+            keywords_from_chunks = chat.get_keywords_from_ollama(chunk)
+            keywords_from_chunks = [keyword.lower() for keyword in keywords_from_chunks]#small caps will help during search process
             summary = chat.get_summary_from_ollama(chunk)
+            keywords_from_summary = chat.get_keywords_from_ollama(summary)#store keywords from summary also
+            keywords = list(set(keywords_from_chunks + keywords_from_summary))
             record = DocumentData(document_name = document_name , chunk_number = chunk_number , chunk_content = chunk , role = role,keywords = keywords,summary = summary)
             chunk_number+=1
             db.add(record)
