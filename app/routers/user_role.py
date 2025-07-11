@@ -9,49 +9,37 @@ from uuid import UUID, uuid4
 router = APIRouter()
 
 
+# Request body for creating or updating user roles
 class UserRoleCreate(BaseModel):
     user: str
     role: str
 
-
+# Response model for returning user role data
 class UserRoleResponse(BaseModel):
-    id: UUID  # Directly use UUID type
+    id: UUID
     user: str
     role: str
 
 
 @router.post("/user-role", response_model=UserRoleResponse, status_code=status.HTTP_201_CREATED)
 def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
-    new_user_role = UserRoleMap(
-        id=uuid4(),  # Generate UUID
-        user=user_role.user,
-        role=user_role.role
-    )
+    """Create a new user role."""
+    new_user_role = UserRoleMap(id=uuid4(), user=user_role.user, role=user_role.role)
     db.add(new_user_role)
     db.commit()
     db.refresh(new_user_role)
-
-    return UserRoleResponse(
-        id=new_user_role.id,
-        user=new_user_role.user,
-        role=new_user_role.role,
-    )
+    return new_user_role
 
 
 @router.get("/user-role", response_model=List[UserRoleResponse])
 def get_all_user_roles(db: Session = Depends(get_db)):
-    roles = db.query(UserRoleMap).all()
-    return [
-        UserRoleResponse(
-            id=role.id,
-            user=role.user,
-            role=role.role
-        ) for role in roles
-    ]
+    """Get all user roles."""
+    return db.query(UserRoleMap).all()
 
 
 @router.put("/user-role/{id}", response_model=UserRoleResponse)
 def update_user_role(id: UUID, updated_data: UserRoleCreate, db: Session = Depends(get_db)):
+    """Update a specific user role by ID."""
     user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
     if not user_role:
         raise HTTPException(status_code=404, detail="User role not found")
@@ -60,16 +48,12 @@ def update_user_role(id: UUID, updated_data: UserRoleCreate, db: Session = Depen
     user_role.role = updated_data.role
     db.commit()
     db.refresh(user_role)
-
-    return UserRoleResponse(
-        id=user_role.id,
-        user=user_role.user,
-        role=user_role.role,
-    )
+    return user_role
 
 
 @router.delete("/user-role/{id}", status_code=status.HTTP_200_OK)
 def delete_user_role(id: UUID, db: Session = Depends(get_db)):
+    """Delete a specific user role by ID."""
     user_role = db.query(UserRoleMap).filter(UserRoleMap.id == id).first()
     if not user_role:
         raise HTTPException(status_code=404, detail="User role not found")

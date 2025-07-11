@@ -5,70 +5,82 @@ from app.database import SessionLocal
 from app.models import DocumentData
 from app.together_client import generate_keywords_and_summary
 
-def divide_into_chunks(content: str, chunk_size: int = 50) -> list[str]:
-    """Splits the content into chunks of specified size."""
-    return [
-        content[i:i + chunk_size]
-        for i in range(0, len(content), chunk_size)
-        if 10 < len(content[i:i + chunk_size]) <= 100
-    ]
+def divide_into_chunks(text: str, chunk_size: int = 50) -> list[str]:
+    """
+    Split the text into smaller parts (chunks) of a given size.
+    """
+    chunks = []
+    for i in range(0, len(text), chunk_size):
+        chunk = text[i:i + chunk_size]
+        if 10 < len(chunk) <= chunk_size:
+            chunks.append(chunk)
+    return chunks
 
 async def process_document(message: dict):
-    """Handles the document processing pipeline."""
+    """
+    Function to process the document:
+    1. Read the PDF file.
+    2. Split the content into smaller parts.
+    3. Generate keywords and summary for each part.
+    4. Store everything in the database.
+    """
     file_path = message["file_path"]
-    original_name = message["original_filename"]
-    role = message.get("role", "Analyst")
+    document_name = message["original_filename"]
+    role = message.get("role", "Default")  # Default role is 'Default'
 
-    print(f"[Worker] Processing file: {original_name} at {file_path}")
+    print(f"Processing document: {document_name}")
 
-    print("[DEBUG] Reading file content...")
-    content = await read_file_content(file_path)
-    print("[DEBUG] Completed reading content.")
+    print(f"Reading PDF")
+    content = await read_pdf(file_path)
+    print(f"PDF content read successfully ({len(content)} characters)")
 
-    print("[DEBUG] Chunking content...")
-    chunks = await chunk_content(content)
-    print(f"[DEBUG] Created {len(chunks)} chunks.")
+    print(f"Splitting content into chunks")
+    chunks = await split_content(content)
+    print(f"Content split into {len(chunks)} chunks")
+    
+    print(f"Saving chunks to database")
+    await save_chunks_to_database(chunks, document_name, role)
+    print(f"Chunks saved to database successfully")
 
-    print("[DEBUG] Storing chunks to DB...")
-    await store_chunks_in_db(chunks, original_name, role)
-    print("[DEBUG] Stored chunks successfully.")
+async def read_pdf(file_path: str) -> str:
+   
+    text = ""
+    with open(file_path, "rb") as file:
+        reader = PyPDF2.PdfReader(file)
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+    return text.strip()
 
-async def read_file_content(file_path: str) -> str:
-    """Extracts text content from a PDF file using PyPDF2."""
-    try:
-        text = ""
-        with open(file_path, "rb") as file:
-            reader = PyPDF2.PdfReader(file)
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text
-        return text.strip()
-    except Exception as e:
-        raise RuntimeError(f"Error reading PDF: {e}")
+async def split_content(text: str) -> list[str]:
+    """
+    Split the text into chunks.
+    Ensure at least 4 chunks by adjusting the size if needed.
+    """
+    chunks = divide_into_chunks(text)
 
-async def chunk_content(content: str) -> list[str]:
-    """Splits content into chunks (between 10–100 characters). Ensures at least 4 chunks."""
-    chunks = divide_into_chunks(content, chunk_size=50)
-
+    # If less than 4 chunks, forcefully split into 4 parts
     if len(chunks) < 4:
-        avg_len = max(10, len(content) // 4)
+        part_size = max(10, len(text) // 4)
         chunks = [
-            content[i:i + avg_len]
-            for i in range(0, len(content), avg_len)
+            text[i:i + part_size]
+            for i in range(0, len(text), part_size)
         ]
 
     return chunks
 
-async def store_chunks_in_db(chunks: list[str], document_name: str, role: str):
-    """Stores each chunk into the `document_data` table with keywords & summary."""
+async def save_chunks_to_database(chunks: list[str], document_name: str, role: str):
+    """
+    Save each chunk along with its keywords and summary into the database.
+    """
     db: Session = SessionLocal()
     try:
         for idx, chunk in enumerate(chunks):
-            print(f"[DEBUG] Generating keywords & summary for chunk {idx+1}...")
+            # Generate keywords and summary for this chunk
             keywords, summary = await generate_keywords_and_summary(chunk)
-            print(f"[DEBUG] Got keywords and summary for chunk {idx+1}.")
 
+            # Create a new database record
             record = DocumentData(
                 chunk_id=str(uuid.uuid4()),
                 document_name=document_name,
@@ -78,10 +90,11 @@ async def store_chunks_in_db(chunks: list[str], document_name: str, role: str):
                 keywords=keywords,
                 summary=summary
             )
-            db.add(record)
-        db.commit()
+            db.add(record)  
+
+        db.commit() 
     except Exception as e:
-        db.rollback()
-        raise RuntimeError(f"Database error: {e}")
+        db.rollback()  
+        raise RuntimeError(f"Failed to save to database: {e}")
     finally:
-        db.close()
+        db.close()  

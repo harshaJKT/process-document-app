@@ -6,8 +6,7 @@ import config
 engine = create_engine(config.DATABASE_URL)
 
 # Create session factory
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
+SessionLocal = sessionmaker(bind=engine)
 
 # Dependency to get database session
 def get_db():
