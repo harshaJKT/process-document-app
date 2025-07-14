@@ -1,6 +1,5 @@
 import asyncio
 
-
 class MessageBroker:
     def __init__(self):
         self.topics = {}
@@ -21,6 +20,7 @@ class MessageBroker:
 
         asyncio.create_task(listen())
 
+        
 
 broker = MessageBroker()
 broker.create_topic("doc_uploaded")

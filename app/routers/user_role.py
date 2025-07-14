@@ -1,17 +1,20 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import SQLAlchemyError
+from pydantic import BaseModel
+import uuid
 from app.database import get_db
 from app.models import UserRoleMap
-import uuid
-from pydantic import BaseModel
+from app.logger import setup_logger
+
+logger = setup_logger(__name__)
 
 router = APIRouter()
-
 
 class UserRoleCreate(BaseModel):
     user: str
     role: str
-
 
 class UserRoleResponse(BaseModel):
     id: str
@@ -22,44 +25,54 @@ class UserRoleResponse(BaseModel):
 @router.post("/user-role", response_model=UserRoleResponse, status_code=201)
 def create_user_role(user_role: UserRoleCreate, db: Session = Depends(get_db)):
     """
-    TODO: Implement POST /user-role
-    - Create new user-role mapping
-    - Generate UUID for id
-    - Save to user_role_map table
-    - Return created mapping
+    Create a new user-role mapping and store it in the database.
     """
     try:
-        # TODO: Create new UserRoleMap instance
-        new_user_role = UserRoleMap(user=user_role.user, role=user_role.role)
+        new_user_role = UserRoleMap(
+            id=uuid.uuid4(),
+            username=user_role.user,
+            role=user_role.role
+        )
 
-        # TODO: Add to database and commit
         db.add(new_user_role)
         db.commit()
         db.refresh(new_user_role)
 
-        return UserRoleResponse(
-            user=user_role.user,
-            role=user_role.role,
+        logger.info(f"Created user-role: {new_user_role.username} => {new_user_role.role}")
+
+        return JSONResponse(
+            content=UserRoleResponse(
+                id=str(new_user_role.id),
+                user=new_user_role.username,
+                role=new_user_role.role
+            ).model_dump(),
+            status_code=201
         )
+
     except Exception as e:
-        return {"error": str(e)}
+        db.rollback()
+        logger.exception("Server error.")
+        return JSONResponse(content={"error": "Server error"}, status_code=500)
 
 
 @router.get("/user-role", response_model=list[UserRoleResponse])
-def get_all_user_roles(db: Session = Depends(get_db)):
+def get_all_user_roles(db: Session =  Depends(get_db)):
     """
-    TODO: Implement GET /user-role
-    - Query all user-role mappings from database
-    - Return list of all mappings
+    Retrieve all user-role mappings from the database.
     """
     try:
-        # TODO: Query all UserRoleMap records
+        db_users = db.query(UserRoleMap).all()
+        logger.info(f"Fetched {len(db_users)} user-role records.")
+        response_array = [
+            UserRoleResponse(
+                id=str(user.id),
+                user=user.username,
+                role=user.role
+            )
+            for user in db_users
+        ]
+        return response_array
 
-        # TODO: Convert to response format
-
-        return []  # Placeholder
     except Exception as e:
-        return {"error": str(e)}
-
-
-# TODO: Implement U and D of CRUD (Create, Read implemented above, Update and Delete to be implemented)
+        logger.exception("Server error .")
+        return JSONResponse(content={"error": "Server error"}, status_code=500)
